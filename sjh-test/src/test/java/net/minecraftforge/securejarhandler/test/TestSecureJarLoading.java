@@ -1,6 +1,9 @@
-package cpw.mods.jarhandling.impl;
+package net.minecraftforge.securejarhandler.test;
 
 import cpw.mods.jarhandling.SecureJar;
+import cpw.mods.jarhandling.impl.Jar;
+import cpw.mods.jarhandling.impl.SecureJarVerifier;
+
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -50,10 +53,10 @@ public class TestSecureJarLoading {
         try (var is = Files.newInputStream(path)) {
             ZipInputStream zis = new ZipInputStream(is);
             for (var ze = zis.getNextEntry(); ze!=null; ze=zis.getNextEntry()) {
-                if (SecureJarVerifier.isSigningRelated(ze.getName())) continue;
-                if (ze.isDirectory()) continue;
                 final var zeName = ze.getName();
-                var cs = ((Jar)jar).verifyAndGetSigners(ze.getName(), zis.readAllBytes());
+                if (SecureJarVerifier.isSigningRelated(zeName)) continue;
+                if (ze.isDirectory()) continue;
+                var cs = ((Jar)jar).verifyAndGetSigners(zeName, zis.readAllBytes());
                 assertAll("Jar behaves correctly",
                         ()->assertNull(cs, "No code signers")
                 );
@@ -112,10 +115,10 @@ public class TestSecureJarLoading {
         try (var is = Files.newInputStream(path)) {
             ZipInputStream zis = new ZipInputStream(is);
             for (var ze = zis.getNextEntry(); ze!=null; ze=zis.getNextEntry()) {
-                if (SecureJarVerifier.isSigningRelated(ze.getName())) continue;
-                if (ze.isDirectory()) continue;
                 final var zeName = ze.getName();
-                var cs = ((Jar)jar).verifyAndGetSigners(ze.getName(), zis.readAllBytes());
+                if (SecureJarVerifier.isSigningRelated(zeName)) continue;
+                if (ze.isDirectory()) continue;
+                var cs = ((Jar)jar).verifyAndGetSigners(zeName, zis.readAllBytes());
                 assertAll("Jar behaves correctly",
                         ()->assertNull(cs, "No code signers")
                 );

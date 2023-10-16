@@ -2,12 +2,9 @@ package cpw.mods.cl;
 
 import cpw.mods.niofs.union.UnionPath;
 
-import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.function.Function;
 

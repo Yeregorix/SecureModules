@@ -27,3 +27,8 @@
 /modlauncher-9.0.1.jar
 /test.jar
 *.jfr
+*.factorypath
+/sjh-jmh/.apt_generated/
+/jmh_results.md
+/test_results.html
+/artifacts/

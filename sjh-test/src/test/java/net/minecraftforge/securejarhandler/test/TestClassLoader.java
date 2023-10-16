@@ -1,4 +1,4 @@
-package cpw.mods.cl.test;
+package net.minecraftforge.securejarhandler.test;
 
 import cpw.mods.cl.JarModuleFinder;
 import cpw.mods.cl.ModuleClassLoader;

@@ -15,7 +15,6 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
-import java.util.StringJoiner;
 import java.util.function.IntBinaryOperator;
 import java.util.stream.IntStream;
 
@@ -23,10 +22,10 @@ public class UnionPath implements Path {
     private final UnionFileSystem fileSystem;
     private final boolean absolute;
     private final String[] pathParts;
-    
+
     // Store the normalized path after it has been created first
     private UnionPath normalized;
-    
+
     UnionPath(final UnionFileSystem fileSystem, final String... pathParts) {
         this.fileSystem = fileSystem;
         if (pathParts.length == 0) {
@@ -52,7 +51,7 @@ public class UnionPath implements Path {
     UnionPath(final UnionFileSystem fileSystem, boolean absolute, final String... pathParts) {
         this(fileSystem, absolute, false, pathParts);
     }
-    
+
     private UnionPath(final UnionFileSystem fileSystem, boolean absolute, boolean isNormalized, final String... pathParts) {
         this.fileSystem = fileSystem;
         this.absolute = absolute;
@@ -100,7 +99,7 @@ public class UnionPath implements Path {
         //    return null;
         return this.fileSystem.getRoot();
     }
-    
+
     @Override
     public Path getFileName() {
         if (this.pathParts.length > 0) {

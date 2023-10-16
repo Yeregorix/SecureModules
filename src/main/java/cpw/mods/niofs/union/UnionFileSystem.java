@@ -4,10 +4,7 @@ import java.io.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.lang.reflect.Method;
-import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
-import java.nio.channels.InterruptibleChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.AccessMode;
 import java.nio.file.DirectoryStream;
@@ -38,18 +35,18 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import net.minecraftforge.unsafe.UnsafeHacks;
+
 public class UnionFileSystem extends FileSystem {
     private static final MethodHandle ZIPFS_EXISTS;
     private static final MethodHandle ZIPFS_CH;
     private static final MethodHandle FCI_UNINTERUPTIBLE;
     static final String SEP_STRING = "/";
 
-
-
     static {
         try {
             var hackfield = MethodHandles.Lookup.class.getDeclaredField("IMPL_LOOKUP");
-            hackfield.setAccessible(true);
+            UnsafeHacks.setAccessible(hackfield);
             MethodHandles.Lookup hack = (MethodHandles.Lookup) hackfield.get(null);
 
             var clz = Class.forName("jdk.nio.zipfs.ZipPath");
@@ -76,9 +73,12 @@ public class UnionFileSystem extends FileSystem {
     }
 
     private static class NoSuchFileException extends java.nio.file.NoSuchFileException {
+        private static final long serialVersionUID = -80990020803201376L;
+
         public NoSuchFileException(final String file) {
             super(file);
         }
+
         @Override
         public synchronized Throwable fillInStackTrace() {
             return this;
@@ -86,6 +86,8 @@ public class UnionFileSystem extends FileSystem {
     }
 
     private static class UncheckedIOException extends java.io.UncheckedIOException {
+        private static final long serialVersionUID = -742496979164359087L;
+
         public UncheckedIOException(final IOException cause) {
             super(cause);
         }
@@ -218,10 +220,6 @@ public class UnionFileSystem extends FileSystem {
     @Override
     public WatchService newWatchService() {
         throw new UnsupportedOperationException();
-    }
-
-    List<Path> getBasePaths() {
-        return this.basepaths;
     }
 
     private Optional<BasicFileAttributes> getFileAttributes(final Path path) {

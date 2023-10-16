@@ -1,45 +1,121 @@
-configurations {
-    jmhOnly
+plugins {
+    id 'eclipse'
+    id 'java-library'
+    id 'org.gradlex.extra-java-module-info' version '1.4.2'
+    id 'net.minecraftforge.gradleutils' version '2.+'
+    id 'com.diffplug.eclipse.apt' version '3.43.0'
+}
+
+repositories {
+    mavenCentral()
+    maven gradleutils.forgeMaven
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(16)
 }
 
 dependencies {
     implementation(rootProject)
-    implementation('org.junit.jupiter:junit-jupiter-engine:5.8.+')
-    implementation('org.apache.logging.log4j:log4j-core:2.17.1')
-    implementation('org.apache.logging.log4j:log4j-api:2.17.1')
-    implementation('org.ow2.asm:asm:9.3')
-    implementation('org.ow2.asm:asm-tree:9.3')
-    implementation('org.ow2.asm:asm-commons:9.3')
     implementation('org.openjdk.jmh:jmh-core:1.35')
-    jmhOnly('org.openjdk.jmh:jmh-core:1.35')
-    jmhOnly('org.openjdk.jmh:jmh-generator-annprocess:1.35')
-    jmhOnly(sourceSets.main.output)
-    compileOnly('org.jetbrains:annotations:23.0.0')
-    runtimeOnly('org.apiguardian:apiguardian-api:1.1.2')
+    runtimeOnly('org.openjdk.jmh:jmh-generator-annprocess:1.35')
+
     annotationProcessor('org.openjdk.jmh:jmh-generator-annprocess:1.35')
 }
 
-task jmh(type: JavaExec, dependsOn: sourceSets.main.output) {
-    javaLauncher = javaToolchains.launcherFor {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
-    jvmArgs= [
-        '-p', sourceSets.main.runtimeClasspath.asPath,
-        '--add-modules', 'ALL-MODULE-PATH',
-        '--add-opens', 'java.base/java.lang.invoke=cpw.mods.securejarhandler',
-        '--add-exports', 'cpw.mods.securejarhandler/cpw.mods.niofs.union=ALL-UNNAMED'
-    ]
-    classpath = files(configurations.jmhOnly.asPath)
+extraJavaModuleInfo {
+    failOnMissingModuleInfo = false
+    automaticModule('jmh-core-1.35.jar', 'jmh.core')
+}
+
+def jmhArgs = [
+    '-bm', 'AverageTime',  // Benchmark mode. Available modes are: [Throughput, AverageTime, SampleTime, SingleShotTime, All]
+    '-r',  '5s',  // Minimum iteration time
+    '-w',  '5s',  // Minimum warmup time
+    '-wi', '2',   // Warmup iterations
+    '-i',  '2',   // Iterations
+    '-tu', 'ns',  // Time unit: [m, s, ms, us, ns]
+    '-f',  '1',   // Forks per benchmark
+    '-rf', 'json', // Results File Format
+    '-prof', 'stack', // Profiler: Simple and naive Java stack profiler
+    '-prof', 'jfr',   // Profiler: Java Flight Recorder profiler
+]
+
+tasks.register('jmh', JavaExec) {
+    dependsOn(rootProject.build)
+    dependsOn(build)
+    classpath = sourceSets.main.runtimeClasspath
     mainClass = 'org.openjdk.jmh.Main'
-    args    '-bm', 'avgt'  // benchmark mode
-    args    '-r', '5s' // iteration time
-    args    '-w', '5s' // warmup time
-    args    '-wi', '2' // warmup iterations
-    args    '-prof', 'stack'
-    args    '-prof', 'jfr' // profilers
-    args    '-tu', 'ns' // time unit
-    args    '-i', '2' // iterations
-    args    '-f', '1' // forks
-    args    '-rff', project.file("${rootProject.buildDir}/jmh_results.txt")  // results file
-    args    'cpw.mods.niofs.union.benchmarks.UnionFileSystemBenchmark'
+    args jmhArgs + ['-rff', rootProject.file('build/jmh_results.json')]
+
+    if (project.hasProperty('javaVendor') && project.hasProperty('javaVersion')) {
+        javaLauncher.set(javaToolchains.launcherFor {
+            it.vendor.set(JvmVendorSpec."${project.property('javaVendor').toUpperCase(Locale.ROOT)}" as JvmVendorSpec)
+            it.languageVersion.set(JavaLanguageVersion.of(project.property('javaVersion') as int))
+            it.implementation.set(JvmImplementation.VENDOR_SPECIFIC)
+        })
+    } else {
+        javaLauncher.set(javaToolchains.launcherFor(java.toolchain))
+    }
+}
+
+// If we are being told a specific vendor then we are probably being run in parallel
+if (project.hasProperty('local_jmh')) { // && (!project.hasProperty('javaVendor') || !project.hasProperty('javaVersion'))) {
+    configurations {
+        groovyScript
+    }
+
+    dependencies {
+        groovyScript 'org.apache.ivy:ivy:2.4.0'
+        groovyScript 'org.codehaus.groovy:groovy-all:3.0.19'
+    }
+
+    tasks.register('jmhAll', JavaExec) {
+        classpath = configurations.groovyScript
+        main = 'groovy.ui.GroovyMain'
+        args '.github/workflows/collect_jmh_results.groovy'
+        workingDir rootProject.projectDir
+    }
+
+    VALID_VMS.each { javaVendor, javaVersions ->
+        javaVersions.each { javaVersion ->
+            def task = tasks.register("jmh${javaVendor}${javaVersion}", JavaExec) {
+                def output = rootProject.file("build/jmh_results/jmh-${javaVendor}${javaVersion}/jmh_results.json")
+                dependsOn(rootProject.build)
+                dependsOn(build)
+                classpath = sourceSets.main.runtimeClasspath
+                mainClass = 'org.openjdk.jmh.Main'
+                args jmhArgs + [
+                    '-v', 'SILENT', // Verbosity [SILENT, NORMAL, EXTRA]
+                    '-rff', output
+                ]
+                doFirst { output.parentFile.mkdirs() }
+                javaLauncher.set(javaToolchains.launcherFor {
+                    it.vendor.set(JvmVendorSpec."${javaVendor.toUpperCase(Locale.ROOT)}" as JvmVendorSpec)
+                    it.languageVersion.set(JavaLanguageVersion.of(javaVersion))
+                    it.implementation.set(JvmImplementation.VENDOR_SPECIFIC)
+                })
+            }
+            jmhAll.dependsOn(task)
+        }
+    }
+}
+
+// Hack eclipse to add the annotation processors in TODO: Upstream this to com.diffplug.eclipse.apt ?
+eclipse {
+    synchronizationTasks(eclipseFactorypath, eclipseJdt, eclipseJdtApt)
+    classpath {
+        file.beforeMerged {
+            file('.apt_generated').mkdirs()
+            def generated = new org.gradle.plugins.ide.eclipse.model.SourceFolder('.apt_generated', 'bin/.apt_generated')
+            generated.entryAttributes['ignore_optional_problems'] = true
+            entries << generated
+        }
+    }
+}
+
+// Hack eclipse into knowing that the gradle deps are modules
+eclipse.classpath {
+    containers 'org.eclipse.buildship.core.gradleclasspathcontainer'
+    file.whenMerged { entries.findAll { it.kind == 'lib' || it.path == 'org.eclipse.buildship.core.gradleclasspathcontainer' }.each { it.entryAttributes['module'] = 'true' } }
 }

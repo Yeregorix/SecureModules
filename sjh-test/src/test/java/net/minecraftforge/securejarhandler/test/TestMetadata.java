@@ -1,4 +1,4 @@
-package cpw.mods.jarhandling.impl;
+package net.minecraftforge.securejarhandler.test;
 
 import cpw.mods.jarhandling.JarMetadata;
 import org.junit.jupiter.api.Assertions;

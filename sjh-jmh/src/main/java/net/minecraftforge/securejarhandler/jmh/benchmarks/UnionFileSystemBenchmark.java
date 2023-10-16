@@ -1,4 +1,4 @@
-package cpw.mods.niofs.union.benchmarks;
+package net.minecraftforge.securejarhandler.jmh.benchmarks;
 
 import cpw.mods.niofs.union.UnionFileSystem;
 import cpw.mods.niofs.union.UnionFileSystemProvider;

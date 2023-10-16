@@ -1,5 +1,6 @@
-package cpw.mods.jarhandling.impl;
+package net.minecraftforge.securejarhandler.test;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -9,7 +10,6 @@ import java.lang.module.ModuleFinder;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
@@ -25,7 +25,7 @@ public class TestClassStuff {
         var is = layer.layer().configuration().findModule("forge").get();
         var m = layer.layer().findModule(is.name()).get();
         var cl = Class.forName(m, "net.minecraftforge.server.ServerMain");
-
+        Assertions.assertNotNull(cl);
     }
 
     static class MyClassLoader extends ClassLoader {

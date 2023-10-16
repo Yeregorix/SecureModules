@@ -1,11 +1,17 @@
-package cpw.mods.niofs.union;
+package net.minecraftforge.securejarhandler.test;
 
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
+import cpw.mods.niofs.union.UnionFileSystem;
+import cpw.mods.niofs.union.UnionFileSystemProvider;
+import cpw.mods.niofs.union.UnionPath;
+import net.minecraftforge.unsafe.UnsafeHacks;
+
+import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -21,16 +27,23 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class TestUnionFS {
     private static final UnionFileSystemProvider UFSP = (UnionFileSystemProvider) FileSystemProvider.installedProviders().stream().filter(fsp->fsp.getScheme().equals("union")).findFirst().orElseThrow(()->new IllegalStateException("Couldn't find UnionFileSystemProvider"));
+
+    @SuppressWarnings("unchecked")
+	private void assertBasePaths(FileSystem fileSystem, List<Path> expected) throws Exception {
+        if (!(fileSystem instanceof UnionFileSystem ufs))
+        	fail("FileSystem was not a UnionFileSystem");
+        var fld = UnionFileSystem.class.getDeclaredField("basepaths");
+        UnsafeHacks.setAccessible(fld);
+        assertIterableEquals(expected, (List<Path>)fld.get(fileSystem));
+    }
+
     @Test
-    void testUnionFileSystem() throws IOException {
+    void testUnionFileSystem() throws Exception {
         final var dir1 = Paths.get("src", "test", "resources", "dir1").toAbsolutePath().normalize();
         final var dir2 = Paths.get("src", "test", "resources", "dir2").toAbsolutePath().normalize();
 
         final var fileSystem = FileSystems.newFileSystem(dir1, Map.of("additional", List.of(dir2)));
-        assertAll(
-                ()->assertTrue(fileSystem instanceof UnionFileSystem),
-                ()->assertIterableEquals(fileSystem instanceof UnionFileSystem ufs ? ufs.getBasePaths(): List.of(), List.of(dir2, dir1))
-        );
+        assertBasePaths(fileSystem, List.of(dir2, dir1));
         UnionFileSystem ufs = (UnionFileSystem) fileSystem;
         final var masktest = ufs.getPath("masktest.txt");
         assertAll(
@@ -49,16 +62,13 @@ public class TestUnionFS {
 
     @Test
     void testUnionFileSystemJar() throws Throwable {
-        final var jar1 = Paths.get("sjh-jmh","src", "testjars", "testjar1.jar").toAbsolutePath().normalize();
-        final var jar2 = Paths.get("sjh-jmh","src", "testjars", "testjar2.jar").toAbsolutePath().normalize();
-        final var jar3 = Paths.get("sjh-jmh","src", "testjars", "testjar3.jar").toAbsolutePath().normalize();
+        final var jar1 = Paths.get("..", "sjh-jmh","src", "testjars", "testjar1.jar").toAbsolutePath().normalize();
+        final var jar2 = Paths.get("..", "sjh-jmh","src", "testjars", "testjar2.jar").toAbsolutePath().normalize();
+        final var jar3 = Paths.get("..", "sjh-jmh","src", "testjars", "testjar3.jar").toAbsolutePath().normalize();
 
         final var fileSystem = UFSP.newFileSystem(jar1, Map.of("additional", List.of(jar2, jar3)));
-        assertAll(
-                ()->assertTrue(fileSystem instanceof UnionFileSystem),
-                ()->assertIterableEquals(fileSystem instanceof UnionFileSystem ufs ? ufs.getBasePaths(): List.of(), List.of(jar3, jar2, jar1))
-        );
-        UnionFileSystem ufs = (UnionFileSystem) fileSystem;
+        assertBasePaths(fileSystem, List.of(jar3, jar2, jar1));
+        var ufs = (UnionFileSystem)fileSystem;
 
         var doexist = List.of("cpw/mods/niofs/union/UnionPath.class", "net/minecraftforge/client/event/GuiOpenEvent.class", "cpw/mods/modlauncher/Launcher.class"); //jar 3
         var dontexist = List.of("cpw/mods/modlauncher/api/NoIDontExist.class", "net/minecraftforge/client/nonexistent/Nope.class", "Missing.class");
@@ -95,7 +105,7 @@ public class TestUnionFS {
                 ()->assertEquals(0, p13.relativize(p13plus).getNameCount())
         );
     }
-    
+
     @Test
     void testRelativizeAbsolute() {
         final var dir1 = Paths.get("src", "test", "resources", "dir1").toAbsolutePath().normalize();
@@ -192,6 +202,7 @@ public class TestUnionFS {
         var npath = Paths.get(uri);
         var input = assertDoesNotThrow(() -> Files.newInputStream(npath));
         var data = assertDoesNotThrow(() -> input.readAllBytes());
+        assertNotNull(data);
     }
 
     @Test
