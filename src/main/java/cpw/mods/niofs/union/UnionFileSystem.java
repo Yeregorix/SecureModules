@@ -1,6 +1,14 @@
+/*
+ * Copyright (c) Forge Development LLC
+ * SPDX-License-Identifier: LGPL-2.1-only
+ */
+
 package cpw.mods.niofs.union;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -32,7 +40,6 @@ import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import net.minecraftforge.unsafe.UnsafeHacks;
@@ -236,14 +243,6 @@ public class UnionFileSystem extends FileSystem {
         }
     }
 
-    private Optional<Path> findFirstPathAt(final UnionPath path) {
-        return this.basepaths.stream()
-                .map(p->toRealPath(p , path))
-                .filter(p->p!=notExistingPath)
-                .filter(Files::exists)
-                .findFirst();
-    }
-
     private static boolean zipFsExists(UnionFileSystem ufs, Path path) {
         try {
             if (Optional.ofNullable(ufs.embeddedFileSystems.get(path.getFileSystem())).filter(efs->!efs.fsCh.isOpen()).isPresent()) throw new IllegalStateException("The zip file has closed!");
@@ -270,12 +269,6 @@ public class UnionFileSystem extends FileSystem {
             }
         }
         return Optional.empty();
-    }
-
-    private <T> Stream<T> streamPathList(final Function<Path,Optional<T>> function) {
-        return this.basepaths.stream()
-                .map(function)
-                .flatMap(Optional::stream);
     }
 
     @SuppressWarnings("unchecked")

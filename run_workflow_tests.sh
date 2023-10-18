@@ -13,4 +13,6 @@ cd artifacts/1/; zip -r ../../test_artifacts.zip *; cd -
 
 # Grab jmh results
 mv artifacts/1/aggregate-results/jmh_results.md .
-mv artifacts/1/aggregate-results/test_results.html .
+
+# Build JUnit Tests
+./gradlew --continue test collectTests

@@ -29,6 +29,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = 'securejarhandler'
-include 'sjh-jmh'
-include 'sjh-test'
+rootProject.name = 'securemodules'
+include 'sm-jmh'
+include 'sm-test'

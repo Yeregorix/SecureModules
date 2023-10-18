@@ -2,10 +2,12 @@ plugins {
     id 'java-library'
     id 'maven-publish'
     id 'eclipse'
+    id 'org.cadixdev.licenser' version '0.6.1'
     id 'org.gradlex.extra-java-module-info' version '1.4.2'
     id 'net.minecraftforge.gradleutils' version '2.+'
 }
 
+group = 'net.minecraftforge'
 version = gradleutils.getTagOffsetVersion()
 logger.lifecycle('Version: ' + version)
 
@@ -36,7 +38,7 @@ changelog {
 jar {
     manifest {
         attributes([
-            'Specification-Title': 'securejarhandler',
+            'Specification-Title': 'securemodules',
             'Specification-Vendor': 'forge',
             'Specification-Version': gradleutils.gitInfo.tag,
             'Implementation-Title': project.name,
@@ -46,12 +48,16 @@ jar {
     }
 }
 
+license {
+    header = file("LICENSE-header.txt")
+}
+
 publishing {
     publications {
         mavenJava(MavenPublication) {
             from components.java
             pom {
-                name = 'Secure Modular Jar handler'
+                name = 'Secure Modular handler'
                 description = 'Making the Java modular system provide security information'
             }
         }

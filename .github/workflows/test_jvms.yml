@@ -48,28 +48,29 @@ jobs:
         run: chmod +x ./gradlew
         
       - name: Run Jmh
-        run: ./gradlew --console=plain --continue :sjh-jmh:jmh -PjavaVendor=${{ matrix.jdk }} -PjavaVersion=${{ matrix.jvm_version }}
+        run: ./gradlew --console=plain --continue :sm-jmh:jmh -PjavaVendor=${{ matrix.jdk }} -PjavaVersion=${{ matrix.jvm_version }}
         
       - name: Upload JMH Results
         uses: actions/upload-artifact@v3
         with:
           name: jmh-${{ matrix.jdk }}-${{ matrix.jvm_version }}
           path: build/jmh_results.json
-        
-      - name: Run Tests
-        run: ./gradlew --console=plain --continue :sjh-test:test -PjavaVendor=${{ matrix.jdk }} -PjavaVersion=${{ matrix.jvm_version }}
-          
-      - name: Upload Test Reports
-        uses: actions/upload-artifact@v3
-        with:
-          name: test-reports-${{ matrix.jdk }}-${{ matrix.jvm_version }}
-          path: build/reports/
-          
-      - name: Upload Test Results
-        uses: actions/upload-artifact@v3
-        with:
-          name: test-results-${{ matrix.jdk }}-${{ matrix.jvm_version }}
-          path: build/test-results/
+      
+      #  It's faster to just run the tests locally.
+      #- name: Run Tests
+      #  run: ./gradlew --console=plain --continue :sm-test:test -PjavaVendor=${{ matrix.jdk }} -PjavaVersion=${{ matrix.jvm_version }}
+      #    
+      #- name: Upload Test Reports
+      #  uses: actions/upload-artifact@v3
+      #  with:
+      #    name: test-reports-${{ matrix.jdk }}-${{ matrix.jvm_version }}
+      #    path: build/reports/
+      #    
+      #- name: Upload Test Results
+      #  uses: actions/upload-artifact@v3
+      #  with:
+      #    name: test-results-${{ matrix.jdk }}-${{ matrix.jvm_version }}
+      #    path: build/test-results/
 
   upload_results:
     name: Upload Jmh results
@@ -92,16 +93,17 @@ jobs:
           path: build/test_artifacts
           
       - name: Collect JMH results
-        run: groovy .github/workflows/collect_jmh_results.groovy
+        run: groovy .github/workflows/aggregate-jmh-results.groovy
         
-      - name: Collect JUnit results
-        run: groovy .github/workflows/aggregate-junit-tests.groovy
+      #- name: Collect JUnit results
+      #  run: groovy .github/workflows/aggregate-junit-tests.groovy
         
       - name: Upload Final Results
         uses: actions/upload-artifact@v3
         with:
           name: aggregate-results
-          path: |
-            jmh_results.md
-            test_results.html
+          path: jmh_results.md
+          #path: |
+          #  jmh_results.md
+          #  test_results.html
          
