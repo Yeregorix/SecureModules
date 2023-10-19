@@ -59,8 +59,8 @@ tasks.register('jmh', JavaExec) {
     }
 }
 
-// If we are being told a specific vendor then we are probably being run in parallel
-if (project.hasProperty('local_jmh')) { // && (!project.hasProperty('javaVendor') || !project.hasProperty('javaVersion'))) {
+// JMH's are expensive to run all variants, so only run if asked to
+if (project.hasProperty('local_jmh')) { 
     configurations {
         groovyScript
     }
@@ -73,7 +73,7 @@ if (project.hasProperty('local_jmh')) { // && (!project.hasProperty('javaVendor'
     tasks.register('jmhAll', JavaExec) {
         classpath = configurations.groovyScript
         main = 'groovy.ui.GroovyMain'
-        args '.github/workflows/collect_jmh_results.groovy'
+        args '.github/workflows/aggregate-jmh-results.groovy'
         workingDir rootProject.projectDir
     }
 
