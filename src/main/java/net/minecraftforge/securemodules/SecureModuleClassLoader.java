@@ -11,10 +11,13 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.security.AllPermission;
+import java.security.CodeSigner;
 import java.security.CodeSource;
+import java.security.MessageDigest;
 import java.security.PermissionCollection;
 import java.security.Permissions;
 import java.security.SecureClassLoader;
+import java.security.cert.Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -29,8 +32,12 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class SecureModuleClassLoader extends SecureClassLoader {
-    @SuppressWarnings("unused")
-    private static void log(String message) { System.out.println(message); } // TODO: [SM] Introduce proper logging framework
+    // TODO: [SM] Introduce proper logging framework
+    private static boolean DEBUG = Boolean.getBoolean("sm.debug");
+    private static void log(String message) {
+        if (DEBUG)
+            System.out.println(message);
+    }
 
     static {
         ClassLoader.registerAsParallelCapable();
@@ -53,6 +60,8 @@ public class SecureModuleClassLoader extends SecureClassLoader {
     private final Map<String, ClassLoader> packageToParentLoader = new HashMap<>();
     private final Map<ModuleReference, ModuleReader> moduleReaders = new ConcurrentHashMap<>();
     private final List<ClassLoader> allParentLoaders;
+    private final Map<String, CodeSource> packageToCodeSource = new ConcurrentHashMap<>();
+    private final boolean useCachedSignersForUnsignedCode;
 
     protected ClassLoader fallbackClassLoader = ClassLoader.getPlatformClassLoader();
 
@@ -61,11 +70,16 @@ public class SecureModuleClassLoader extends SecureClassLoader {
     }
 
     public SecureModuleClassLoader(String name, Configuration config, List<ModuleLayer> parentLayers, ClassLoader parent) {
+        this(name, config, parentLayers, parent, false);
+    }
+
+    public SecureModuleClassLoader(String name, Configuration config, List<ModuleLayer> parentLayers, ClassLoader parent, boolean useCachedSignersForUnsignedCode) {
         super(name, parent);
         if (parent != null) // No need to be backwards compatible if they specify the parent
             fallbackClassLoader = null;
 
         this.configuration = config;
+        this.useCachedSignersForUnsignedCode = useCachedSignersForUnsignedCode;
         this.parents = Stream.concat(parentLayers.stream(), List.of(ModuleLayer.boot()).stream()).distinct().toList(); // Old cpw code sends in duplicate layers Guard against
         this.allParentLoaders = this.parents.stream()
             .flatMap(p -> p.modules().stream())
@@ -95,16 +109,16 @@ public class SecureModuleClassLoader extends SecureClassLoader {
 
             if (ref instanceof SecureModuleReference smr)
                 this.ourModulesSecure.put(smr.descriptor().name(), smr);
-            //else
-            //    log("[SecureModuleClassLoader] Insecure module: " + module);
+            else
+                log("[SecureModuleClassLoader] Insecure module: " + module);
 
         }
 
-        /*
-        log("New ModuleClassLoader(" + name + ", @" + config.hashCode() + "[" + config + "])");
-        for (var parent : parents)
-            log("  Parent @" + parent.hashCode() + "[" + parent.configuration() + "]");
-        */
+        if (DEBUG) {
+            log("New ModuleClassLoader(" + name + ", @" + config.hashCode() + "[" + config + "])");
+            for (var p : parents)
+                log("  Parent @" + p.hashCode() + "[" + p.configuration() + "]");
+        }
 
         // Gather packages in other classloaders that our modules read
         for (var module : config.modules()) {
@@ -410,9 +424,7 @@ public class SecureModuleClassLoader extends SecureClassLoader {
         tryDefinePackage(name, data, url);
 
         var signers = data == null ? null : data.getCodeSigners(classToResource(name), bytes);
-        var cs = new CodeSource(url, signers);
-
-        return defineClass(name, bytes, 0, bytes.length, cs);
+        return defineClass(name, bytes, 0, bytes.length, getCodeSource(name, url, signers));
     }
 
     @Override
@@ -549,4 +561,78 @@ public class SecureModuleClassLoader extends SecureClassLoader {
         return module == null ? null : module.name();
     }
 
+    private static final Certificate[] EMPTY_CERTS = new Certificate[0];
+    /*
+     * All classes in the same package must have the exact same signers.
+     * The JRE enforces this in ClassLoader.checkCerts
+     * However in Minecraft world we expect to see dynamic classes
+     * and modified classes in the same package as clean classes.
+     * So what we do is capture the FIRST codesource we see in the package.
+     * Then use that for all other classes from then on.
+     * However, we should also log when signatures are missing. So that
+     * consumers can know.
+     */
+    private CodeSource getCodeSource(String name, URL url, CodeSigner[] signers) {
+        var clsCS = new CodeSource(url, signers);
+        if (!this.useCachedSignersForUnsignedCode)
+            return clsCS;
+
+        var pkgCS = this.packageToCodeSource.computeIfAbsent(classToPackage(name), pkg -> clsCS);
+        if (DEBUG && pkgCS != clsCS) {
+            var pCerts = or(pkgCS.getCertificates(), EMPTY_CERTS);
+            var cCerts = or(clsCS.getCertificates(), EMPTY_CERTS);
+            if (pCerts.length == 0 && cCerts.length == 0)
+                return pkgCS;
+
+            boolean found = false;
+            for (var cert : cCerts) {
+                found = false;
+                for (var pcert : pCerts) {
+                    if (cert.equals(pcert)) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                    log("Class " + name + " has extra certificate: " + getFingerprint(cert));
+            }
+            for (var pcert : pCerts) {
+                found = false;
+                for (var cert : cCerts) {
+                    if (pcert.equals(cert)) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                    log("Class " + name + " has missing certificate: " + getFingerprint(pcert));
+            }
+        }
+        return pkgCS;
+    }
+
+    private static <R> R or(R left, R right) {
+        return left != null ? left : right;
+    }
+
+    private static String getFingerprint(Certificate cert) {
+        if (cert == null)
+            return "NULL";
+
+        try {
+            var md = MessageDigest.getInstance("SHA-1");
+            md.update(cert.getEncoded());
+            var digest = md.digest();
+            var ret = new StringBuilder(2 * digest.length);
+            for (var c : digest) {
+                var h = c & 0x0F;
+                ret.append(h < 10 ? '0' + h : 'A' + h);
+                h = (c & 0xF0) >> 4;
+                ret.append(h < 10 ? '0' + h : 'A' + h);
+            }
+            return ret.toString();
+        } catch (Exception e) {
+            return "Exception: " + e.getMessage();
+        }
+    }
 }

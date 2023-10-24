@@ -26,7 +26,7 @@ public class ModuleClassLoader extends SecureModuleClassLoader {
      * ======================================================================
      */
     public ModuleClassLoader(String name, Configuration config, List<ModuleLayer> parentLayers) {
-        super(name, config, parentLayers, null);
+        super(name, config, parentLayers, null, true);
     }
 
     @Override
