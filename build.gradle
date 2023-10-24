@@ -1,3 +1,5 @@
+import net.minecraftforge.gradleutils.PomUtils
+
 plugins {
     id 'java-library'
     id 'maven-publish'
@@ -8,8 +10,8 @@ plugins {
 }
 
 group = 'net.minecraftforge'
-version = gradleutils.getTagOffsetVersion()
-logger.lifecycle('Version: ' + version)
+version = gradleutils.tagOffsetVersion
+print("Version: $version")
 
 java {
     toolchain.languageVersion = JavaLanguageVersion.of(16)
@@ -38,12 +40,12 @@ changelog {
 jar {
     manifest {
         attributes([
-            'Specification-Title': 'securemodules',
-            'Specification-Vendor': 'forge',
-            'Specification-Version': gradleutils.gitInfo.tag,
-            'Implementation-Title': project.name,
+            'Specification-Title':    'SecureModules',
+            'Specification-Vendor':   'Forge Development LLC',
+            'Specification-Version':  gradleutils.gitInfo.tag,
+            'Implementation-Title':   'SecureModules',
             'Implementation-Version': project.version,
-            'Implementation-Vendor':'forge'
+            'Implementation-Vendor':  'Forge Development LLC'
         ] as LinkedHashMap)
     }
 }
@@ -53,17 +55,21 @@ license {
 }
 
 publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            from components.java
-            pom {
-                name = 'Secure Modular handler'
-                description = 'Making the Java modular system provide security information'
+    publications.register('mavenJava', MavenPublication) {
+        from components.java
+        artifactId = 'securemodules'
+        pom {
+            name = 'Secure Modular handler'
+            description = 'Making the Java modular system provide security information'
+            license PomUtils.Licenses.LGPLv2_1
+            developers {
+                developer PomUtils.Developers.cpw
+                developer PomUtils.Developers.LexManos
             }
         }
     }
     repositories {
-        maven gradleutils.getPublishingForgeMaven()
+        maven gradleutils.publishingForgeMaven
     }
 }
 

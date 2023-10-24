@@ -25,7 +25,7 @@ public class ModuleClassLoader extends SecureModuleClassLoader {
      * 				API Ment for modders to consume
      * ======================================================================
      */
-    public ModuleClassLoader(String name, Configuration config, @Deprecated List<ModuleLayer> parentLayers) {
+    public ModuleClassLoader(String name, Configuration config, List<ModuleLayer> parentLayers) {
         super(name, config, parentLayers, null);
     }
 

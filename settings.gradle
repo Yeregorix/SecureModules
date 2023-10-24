@@ -12,7 +12,7 @@ plugins {
 dependencyResolutionManagement {
     versionCatalogs {
         libs {
-            version('asm', '9.3')
+            version('asm', '9.6')
             library('asm',         'org.ow2.asm', 'asm'        ).versionRef('asm')
             library('asm-tree',    'org.ow2.asm', 'asm-tree'   ).versionRef('asm')
             library('asm-commons', 'org.ow2.asm', 'asm-commons').versionRef('asm')
@@ -22,13 +22,13 @@ dependencyResolutionManagement {
 			library('junit-api', 'org.junit.jupiter', 'junit-jupiter-api').versionRef('junit')
 			library('junit-engine', 'org.junit.jupiter', 'junit-jupiter-engine').versionRef('junit')
 			library('junit-platform-launcher', 'org.junit.platform:junit-platform-launcher:1.10.0')
-			bundle('junit-runtime', ['junit-engine', 'junit-platform-launcher']) // Force Gradle to load the JUnit Platform Launcher from the module-path
+			bundle('junit-runtime', ['junit-engine', 'junit-platform-launcher'])
             
-			library('unsafe', 'net.minecraftforge:unsafe:0.9.0')
+			library('unsafe', 'net.minecraftforge:unsafe:0.9.2')
         }
     }
 }
 
-rootProject.name = 'securemodules'
+rootProject.name = 'SecureModules'
 include 'sm-jmh'
 include 'sm-test'

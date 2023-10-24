@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class SecureModuleClassLoader extends SecureClassLoader {
+    @SuppressWarnings("unused")
     private static void log(String message) { System.out.println(message); } // TODO: [SM] Introduce proper logging framework
 
     static {
@@ -53,7 +54,6 @@ public class SecureModuleClassLoader extends SecureClassLoader {
     private final Map<ModuleReference, ModuleReader> moduleReaders = new ConcurrentHashMap<>();
     private final List<ClassLoader> allParentLoaders;
 
-    @Deprecated(forRemoval = true)
     protected ClassLoader fallbackClassLoader = ClassLoader.getPlatformClassLoader();
 
     public SecureModuleClassLoader(String name, Configuration config, List<ModuleLayer> parentLayers) {
@@ -86,18 +86,18 @@ public class SecureModuleClassLoader extends SecureClassLoader {
         this.allParentLoaders.removeAll(overlaping);
 
 
-        // So 'resolvedRoots' seems to be trying to be our special 'SecureJar' references, TODO: See if we actually need it.
+        // Find all modules for this config, if the reference is our special Secure reference, we can define packages with security info.
         for (var module : config.modules()) {
             var ref = module.reference();
             this.ourModules.put(ref.descriptor().name(), ref);
+            for (var pkg : ref.descriptor().packages())
+                this.packageToOurModules.put(pkg, module);
 
-            if (ref instanceof SecureModuleReference smr) {
+            if (ref instanceof SecureModuleReference smr)
                 this.ourModulesSecure.put(smr.descriptor().name(), smr);
-                for (var pkg : smr.descriptor().packages())
-                    this.packageToOurModules.put(pkg, module);
-            } else {
-                log("Invalid ModuleClassLoader module: " + module);
-            }
+            //else
+            //    log("[SecureModuleClassLoader] Insecure module: " + module);
+
         }
 
         /*
@@ -371,7 +371,11 @@ public class SecureModuleClassLoader extends SecureClassLoader {
                         var parent = this.packageToParentLoader.get(pkg);
                         if (parent == null)
                             parent = fallbackClassLoader;
-                        c = parent.loadClass(name);
+
+                        if (parent == null)
+                            c = super.loadClass(name, false);
+                        else
+                            c = parent.loadClass(name);
                     }
                 }
             }

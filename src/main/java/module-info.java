@@ -16,9 +16,11 @@ module cpw.mods.securejarhandler {
     requires org.objectweb.asm;
     requires org.objectweb.asm.tree;
     requires java.base;
+
+    requires jdk.unsupported;
     requires net.minecraftforge.unsafe;
 
-    // TODO: Move UnionFS out into its own project
+    // TODO: [SM] Move UnionFS out into its own project
     provides java.nio.file.spi.FileSystemProvider
         with cpw.mods.niofs.union.UnionFileSystemProvider;
 
