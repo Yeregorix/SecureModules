@@ -122,4 +122,13 @@ public class TestSecureJarLoading {
             }
         }
     }
+
+    @Test // Test opening the same file multiple times.
+    void testSameJar() throws Exception {
+        var path = Paths.get("src", "test", "resources", "empty.zip");
+        var jar1 = SecureJar.from(path);
+        assertNotNull(jar1);
+        var jar2 = SecureJar.from(path);
+        assertNotNull(jar2);
+    }
 }

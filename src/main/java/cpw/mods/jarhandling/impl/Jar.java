@@ -16,6 +16,8 @@ import java.lang.module.ModuleDescriptor;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.FileSystem;
+import java.nio.file.FileSystemAlreadyExistsException;
+import java.nio.file.FileSystemNotFoundException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -185,9 +187,14 @@ public class Jar implements SecureJar {
                     return paths[0];
                 // We have to manually open the jar files up via a URI instead of a Path
                 // because the ZipFileSystem implementation only caches the FileSystems
-                // when accessed that way.
+                // when accessed that way. But we can only open it once or else it throws
+                // a FileSystemAlreadyExistsException. So, exceptions as codeflow, yay!
                 var uri = new URI("jar:" + paths[0].toUri());
-                fs = FileSystems.newFileSystem(uri, Map.of(), null);
+                try {
+                    fs = FileSystems.newFileSystem(uri, Map.of(), null);
+                } catch (FileSystemAlreadyExistsException e) {
+                    fs = FileSystems.getFileSystem(uri);
+                }
             } else {
                 var map = new HashMap<String, Object>();
                 if (filter != null)
