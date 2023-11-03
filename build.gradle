@@ -37,7 +37,7 @@ changelog {
     fromTag '0.9'
 }
 
-jar {
+tasks.named('jar', Jar).configure {
     manifest {
         attributes([
             'Specification-Title':    'SecureModules',
@@ -48,6 +48,17 @@ jar {
             'Implementation-Vendor':  'Forge Development LLC'
         ] as LinkedHashMap)
     }
+}
+
+tasks.register('writeManifest') {
+    doLast {
+        jar.manifest.writeTo(file('src/main/resources/META-INF/MANIFEST.MF'))
+    }
+}
+
+eclipse {
+    synchronizationTasks writeManifest
+    autoBuildTasks writeManifest 
 }
 
 license {

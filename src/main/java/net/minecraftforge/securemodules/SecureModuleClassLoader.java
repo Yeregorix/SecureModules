@@ -18,14 +18,18 @@ import java.security.PermissionCollection;
 import java.security.Permissions;
 import java.security.SecureClassLoader;
 import java.security.cert.Certificate;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.Attributes;
 import java.util.stream.Collectors;
@@ -44,16 +48,20 @@ public class SecureModuleClassLoader extends SecureClassLoader {
         setupModularURLHandler();
     }
 
-    @SuppressWarnings("removal")
     private static void setupModularURLHandler() {
-        var handler = cpw.mods.cl.ModularURLHandler.INSTANCE;
-        URL.setURLStreamHandlerFactory(handler);
+        @SuppressWarnings("removal")
+        LayerAwareURLStreamHandlerFactory handler = cpw.mods.cl.ModularURLHandler.INSTANCE;
+        try {
+            URL.setURLStreamHandlerFactory(handler);
+        } catch (Error e) {
+            // Already Set
+        }
         handler.findProviders(SecureModuleClassLoader.class.getModule().getLayer());
     }
 
     // TODO: [SM][Deprecation] Make private once cpw.mods.cl.ModuleClassLoader is deleted
     protected final Configuration configuration;
-    private final List<ModuleLayer> parents;
+    private final Set<ModuleLayer> parents;
     private final Map<String, ModuleReference> ourModules = new HashMap<>();
     private final Map<String, SecureModuleReference> ourModulesSecure = new HashMap<>();
     private final Map<String, ResolvedModule> packageToOurModules = new HashMap<>();
@@ -80,7 +88,7 @@ public class SecureModuleClassLoader extends SecureClassLoader {
 
         this.configuration = config;
         this.useCachedSignersForUnsignedCode = useCachedSignersForUnsignedCode;
-        this.parents = Stream.concat(parentLayers.stream(), List.of(ModuleLayer.boot()).stream()).distinct().toList(); // Old cpw code sends in duplicate layers Guard against
+        this.parents = findAllParents(parentLayers);
         this.allParentLoaders = this.parents.stream()
             .flatMap(p -> p.modules().stream())
             .map(Module::getClassLoader)
@@ -132,10 +140,8 @@ public class SecureModuleClassLoader extends SecureClassLoader {
                     .findFirst()
                     .orElse(null);
 
-
                 if (layer == null)
                     throw new IllegalStateException("Could not find parent layer for module `" + other.name() + "` read by `" + module.name() + "`");
-
 
                 var cl = layer == null ? null : layer.findLoader(other.name());
                 if (cl == null)
@@ -634,5 +640,23 @@ public class SecureModuleClassLoader extends SecureClassLoader {
         } catch (Exception e) {
             return "Exception: " + e.getMessage();
         }
+    }
+
+    /** Finds all parents for a list of module layers. Including the listed layers.
+        This is basically ModuleLayer.stream() but thats private api so I do it myself.
+     */
+    private static Set<ModuleLayer> findAllParents(Collection<ModuleLayer> parents) {
+        var ret = new LinkedHashSet<ModuleLayer>(parents);
+        var stack = new ArrayDeque<ModuleLayer>(parents);
+
+        while (!stack.isEmpty()) {
+            var layer = stack.pop();
+            for (var parent : layer.parents()) {
+                if (ret.add(parent))
+                    stack.push(parent);
+            }
+        }
+
+        return ret;
     }
 }

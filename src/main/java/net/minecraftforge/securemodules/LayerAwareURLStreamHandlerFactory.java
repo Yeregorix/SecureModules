@@ -25,9 +25,7 @@ public class LayerAwareURLStreamHandlerFactory implements URLStreamHandlerFactor
     protected Map<String, Optional<URLStreamHandler>> handlers;
     private List<URLStreamHandlerProvider> services;
 
-    /** TODO: [SM][Deprecation] Move to package private when I delete cpw.mods.cl.ModularURLHandler */
-    @Deprecated
-    public void findProviders(ModuleLayer layer) {
+    protected void findProviders(ModuleLayer layer) {
         if (layer == null) {
             handlers = null;
             services = null;
