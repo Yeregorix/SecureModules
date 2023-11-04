@@ -35,7 +35,7 @@ public class TestDummyJarProvider {
     public void testDummySecureJar() {
         final var jmf = SecureModuleFinder.of(new DummyJar());
         final var cf = Configuration.resolveAndBind(jmf, List.of(ModuleLayer.boot().configuration()), ModuleFinder.of(), List.of("testdummy"));
-        final var mcl = new SecureModuleClassLoader("TEST", cf, List.of(ModuleLayer.boot()), null);
+        final var mcl = new SecureModuleClassLoader("TEST", null, cf, List.of(ModuleLayer.boot()));
         final var ml = ModuleLayer.defineModules(cf, List.of(ModuleLayer.boot()), f->mcl);
         final var mod = ml.layer().findModule("testdummy").orElseThrow();
         final var rmod = cf.findModule("testdummy").orElseThrow();

@@ -19,7 +19,7 @@ public class TestClassLoader {
     @Test
     void findsResourceFromNonBootLayer() throws Exception {
         var cfg = ModuleLayer.boot().configuration().resolveAndBind(SecureModuleFinder.of(), ModuleFinder.ofSystem(), List.of());
-        var cl = new SecureModuleClassLoader("test", cfg, List.of(ModuleLayer.boot()), null);
+        var cl = new SecureModuleClassLoader("test", null, cfg, List.of(ModuleLayer.boot()));
 
         var layer = ModuleLayer.boot().defineModules(cfg, m -> cl); // Should we actually find the classloader from the parent layers?
                                                                     // It's used by the service loader to find module layers from classloaders

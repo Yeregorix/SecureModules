@@ -26,7 +26,11 @@ public class ModuleClassLoader extends SecureModuleClassLoader {
      * ======================================================================
      */
     public ModuleClassLoader(String name, Configuration config, List<ModuleLayer> parentLayers) {
-        super(name, config, parentLayers, null, true);
+        super(name, null, config, parentLayers, List.of(), true);
+    }
+
+    public ModuleClassLoader(String name, ClassLoader parent, Configuration config, List<ModuleLayer> parentLayers, List<ClassLoader> parentLoaders, boolean unifySigners) {
+        super(name, parent, config, parentLayers, parentLoaders, unifySigners);
     }
 
     @Override

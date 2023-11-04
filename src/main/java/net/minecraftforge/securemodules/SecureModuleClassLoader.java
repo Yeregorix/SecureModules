@@ -26,22 +26,21 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.jar.Attributes;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class SecureModuleClassLoader extends SecureClassLoader {
     // TODO: [SM] Introduce proper logging framework
-    private static boolean DEBUG = Boolean.getBoolean("sm.debug");
-    private static void log(String message) {
-        if (DEBUG)
-            System.out.println(message);
-    }
+    private final boolean DEBUG;
 
     static {
         ClassLoader.registerAsParallelCapable();
@@ -61,52 +60,56 @@ public class SecureModuleClassLoader extends SecureClassLoader {
 
     // TODO: [SM][Deprecation] Make private once cpw.mods.cl.ModuleClassLoader is deleted
     protected final Configuration configuration;
+    private final ClassLoader parent;
     private final Set<ModuleLayer> parents;
+    private final List<ClassLoader> allParentLoaders;
     private final Map<String, ModuleReference> ourModules = new HashMap<>();
     private final Map<String, SecureModuleReference> ourModulesSecure = new HashMap<>();
     private final Map<String, ResolvedModule> packageToOurModules = new HashMap<>();
     private final Map<String, ClassLoader> packageToParentLoader = new HashMap<>();
     private final Map<ModuleReference, ModuleReader> moduleReaders = new ConcurrentHashMap<>();
-    private final List<ClassLoader> allParentLoaders;
     private final Map<String, CodeSource> packageToCodeSource = new ConcurrentHashMap<>();
     private final boolean useCachedSignersForUnsignedCode;
 
-    protected ClassLoader fallbackClassLoader = ClassLoader.getPlatformClassLoader();
+    protected ClassLoader fallbackClassLoader = null;
 
+    // Parent should always be sent in, even if its null, this just makes my life easier - Lex
+    @Deprecated(forRemoval = true, since = "10.1")
     public SecureModuleClassLoader(String name, Configuration config, List<ModuleLayer> parentLayers) {
-        this(name, config, parentLayers, null);
+        this(name, null, config, parentLayers);
     }
 
+    @Deprecated(forRemoval = true, since = "10.1")
     public SecureModuleClassLoader(String name, Configuration config, List<ModuleLayer> parentLayers, ClassLoader parent) {
-        this(name, config, parentLayers, parent, false);
+        this(name, parent, config, parentLayers);
     }
 
+    @Deprecated(forRemoval = true, since = "10.1")
     public SecureModuleClassLoader(String name, Configuration config, List<ModuleLayer> parentLayers, ClassLoader parent, boolean useCachedSignersForUnsignedCode) {
-        super(name, parent);
-        if (parent != null) // No need to be backwards compatible if they specify the parent
-            fallbackClassLoader = null;
+        this(name, parent, config, parentLayers, List.of(), useCachedSignersForUnsignedCode);
+    }
 
+
+    public SecureModuleClassLoader(String name, ClassLoader parent, Configuration config, List<ModuleLayer> parentLayers) {
+        this(name, parent, config, parentLayers, List.of());
+    }
+
+    public SecureModuleClassLoader(String name, ClassLoader parent, Configuration config, List<ModuleLayer> parentLayers, List<ClassLoader> parentLoaders) {
+        this(name, parent, config, parentLayers, parentLoaders, false);
+    }
+
+    public SecureModuleClassLoader(String name, ClassLoader parent, Configuration config, List<ModuleLayer> parentLayers, List<ClassLoader> parentLoaders, boolean useCachedSignersForUnsignedCode) {
+        super(name, getSingleParent(parent, parentLoaders));
+        this.DEBUG = shouldDebug(name);
+
+        if (parent == null && parentLoaders.size() == 1)
+            this.parent = parentLoaders.iterator().next();
+        else
+            this.parent = parent;
         this.configuration = config;
         this.useCachedSignersForUnsignedCode = useCachedSignersForUnsignedCode;
-        this.parents = findAllParents(parentLayers);
-        this.allParentLoaders = this.parents.stream()
-            .flatMap(p -> p.modules().stream())
-            .map(Module::getClassLoader)
-            .filter(cl -> cl != null)
-            .distinct()
-            .collect(Collectors.toCollection(ArrayList::new));
-
-        // remove all that are covered by their parent loaders.
-        var overlaping = new ArrayList<ClassLoader>();
-        for (var loader : this.allParentLoaders) {
-            do {
-                loader = loader.getParent();
-                if (loader != null && this.allParentLoaders.contains(loader))
-                    overlaping.add(loader);
-            } while (loader != null);
-        }
-        this.allParentLoaders.removeAll(overlaping);
-
+        this.parents = findAllParentLayers(parentLayers);
+        this.allParentLoaders = !parentLoaders.isEmpty() ? parentLoaders : findAllParentLoaders(this.parents);
 
         // Find all modules for this config, if the reference is our special Secure reference, we can define packages with security info.
         for (var module : config.modules()) {
@@ -221,20 +224,25 @@ public class SecureModuleClassLoader extends SecureClassLoader {
     public URL getResource(String name) {
         Objects.requireNonNull(name);
 
-        var url = super.getResource(name);
+        // Check ourselves first so we can override others
+        var url = findResource(name);
         if (url != null)
             return url;
 
-        // The normal Modulear classloader { jdk.internal.loader.Loader.getResource(String) } delegates to the parent
-        // But for some reason we set the parent to null
-        // So manually look in the parent layers.
+        // Check our module layer parents
         for (var parent : this.allParentLoaders) {
             url = parent.getResource(name);
             if (url != null)
                 return url;
         }
 
-        return null;
+        if (this.parent != null)
+            return this.parent.getResource(name);
+
+        // If our parent is null we need to check the boot loader
+        // But there is no way to access that so we must rely on super functionality
+        // This WILL call findResource(String) again, but what's a few wasted cycles
+        return super.getResource(name);
     }
 
     @Override
@@ -290,13 +298,26 @@ public class SecureModuleClassLoader extends SecureClassLoader {
         var results = new ArrayList<Enumeration<URL>>();
         results.add(findResources(name));
 
-        for (var parent : this.allParentLoaders) {
+        for (var parent : this.allParentLoaders)
             results.add(parent.getResources(name));
-        }
+
+        if (this.parent != null)
+            results.add(this.parent.getResources(name));
+
+        // TODO: [SM] If our parent is null we should look a the bootstrap classloader, but that requires calling super, which will duplicate resources
 
         return new Enumeration<>() {
             private Enumeration<Enumeration<URL>> itr = Collections.enumeration(results);
-            private Enumeration<URL> current = itr.hasMoreElements() ? itr.nextElement() : null;
+            private Enumeration<URL> current = findNext();
+
+            private Enumeration<URL> findNext() {
+                while (itr.hasMoreElements()) {
+                    var next = itr.nextElement();
+                    if (next.hasMoreElements())
+                        return next;
+                }
+                return null;
+            }
 
             @Override
             public boolean hasMoreElements() {
@@ -305,9 +326,14 @@ public class SecureModuleClassLoader extends SecureClassLoader {
 
             @Override
             public URL nextElement() {
+                if (current == null)
+                    throw new NoSuchElementException();
+
                 var ret = current.nextElement();
+
                 if (!current.hasMoreElements())
-                    current = itr.hasMoreElements() ? itr.nextElement() : null;
+                    current = findNext();
+
                 return ret;
             }
         };
@@ -385,20 +411,38 @@ public class SecureModuleClassLoader extends SecureClassLoader {
                 if (!pkg.isEmpty()) {
                     var module = this.packageToOurModules.get(pkg);
 
-                    if (module != null)
+                    if (module != null) {
                         c = findClass(module.name(), name);
-                    else {
-                        var parent = this.packageToParentLoader.get(pkg);
-                        if (parent == null)
-                            parent = fallbackClassLoader;
+                        if (c != null)
+                            log(() -> this + " Found: " + name + " in self");
+                    } else {
+                        var parent = this.packageToParentLoader.getOrDefault(pkg, fallbackClassLoader);
 
-                        if (parent == null)
-                            c = super.loadClass(name, false);
-                        else
+                        if (parent != null) {
                             c = parent.loadClass(name);
+                            if (c != null)
+                                log(() -> this + " Found: " + name + " in " + parent);
+                        } else if (this.parent != null) {
+                            c = this.parent.loadClass(name);
+                            if (c != null)
+                                log(() -> this + " Found: " + name + " in " + this.parent);
+                        } else if (this.allParentLoaders.isEmpty()) {
+                            c = super.loadClass(name, false);
+                            if (c != null)
+                                log(() -> this + " Found: " + name + " in super");
+                        } else {
+                            for (var loader : this.allParentLoaders) {
+                                try {
+                                    c = loader.loadClass(name);
+                                } catch (ClassNotFoundException e) {
+                                    // Lets look for the next one
+                                }
+                            }
+                        }
                     }
                 }
             }
+
             if (c == null)
                 throw new ClassNotFoundException(name);
 
@@ -413,6 +457,11 @@ public class SecureModuleClassLoader extends SecureClassLoader {
      * 				INTERNAL IMPLEMENTATION CRAP
      * ======================================================================
      */
+    @Override
+    public String toString() {
+        return this.getClass().getSimpleName() + "[" + this.getName() + "]@" + this.hashCode();
+    }
+
     private Class<?> readerToClass(ModuleReader reader, ModuleReference ref, String name) {
         byte[] bytes;
         try {
@@ -645,7 +694,7 @@ public class SecureModuleClassLoader extends SecureClassLoader {
     /** Finds all parents for a list of module layers. Including the listed layers.
         This is basically ModuleLayer.stream() but thats private api so I do it myself.
      */
-    private static Set<ModuleLayer> findAllParents(Collection<ModuleLayer> parents) {
+    private static Set<ModuleLayer> findAllParentLayers(Collection<ModuleLayer> parents) {
         var ret = new LinkedHashSet<ModuleLayer>(parents);
         var stack = new ArrayDeque<ModuleLayer>(parents);
 
@@ -658,5 +707,55 @@ public class SecureModuleClassLoader extends SecureClassLoader {
         }
 
         return ret;
+    }
+
+    private static List<ClassLoader> findAllParentLoaders(Collection<ModuleLayer> parents) {
+        var all = parents.stream()
+            .flatMap(p -> p.modules().stream())
+            .map(Module::getClassLoader)
+            .filter(cl -> cl != null)
+            .distinct()
+            .collect(Collectors.toCollection(ArrayList::new));
+
+        // remove all that are covered by their parent loaders.
+        var overlaping = new ArrayList<ClassLoader>();
+        for (var loader : all) {
+            do {
+                loader = loader.getParent();
+                if (loader != null && all.contains(loader))
+                    overlaping.add(loader);
+            } while (loader != null);
+        }
+
+        all.removeAll(overlaping);
+        return all;
+    }
+
+    private static boolean shouldDebug(String name) {
+        var prop = System.getProperty("smcl.debug");
+        if (prop == null)
+            return false;
+        prop = prop.toLowerCase(Locale.ROOT);
+        if ("true".equals(prop))
+            return true;
+        return prop.contains(name.toLowerCase());
+    }
+
+    private static ClassLoader getSingleParent(ClassLoader override, Collection<ClassLoader> parents) {
+        if (override != null)
+            return override;
+        return parents.size() == 1 ? parents.iterator().next() : null;
+    }
+
+    private void log(String message) {
+        log(() -> message);
+    }
+
+    private void log(Supplier<String> message) {
+        if (DEBUG) {
+            var msg = message.get();
+            if (msg != null)
+                System.out.println(msg);
+        }
     }
 }
