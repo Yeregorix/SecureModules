@@ -17,7 +17,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystemAlreadyExistsException;
-import java.nio.file.FileSystemNotFoundException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -185,15 +184,25 @@ public class Jar implements SecureJar {
             if (filter == null && paths.length == 1) {
                 if (Files.isDirectory(paths[0]))
                     return paths[0];
-                // We have to manually open the jar files up via a URI instead of a Path
-                // because the ZipFileSystem implementation only caches the FileSystems
-                // when accessed that way. But we can only open it once or else it throws
-                // a FileSystemAlreadyExistsException. So, exceptions as codeflow, yay!
-                var uri = new URI("jar:" + paths[0].toUri());
-                try {
-                    fs = FileSystems.newFileSystem(uri, Map.of(), null);
-                } catch (FileSystemAlreadyExistsException e) {
-                    fs = FileSystems.getFileSystem(uri);
+                var uri = paths[0].toUri();
+                if ("file".equals(uri.getScheme())) {
+                    // We have to manually open the jar files up via a URI instead of a Path
+                    // because the ZipFileSystem implementation only caches the FileSystems
+                    // when accessed that way. But we can only open it once or else it throws
+                    // a FileSystemAlreadyExistsException. So, exceptions as codeflow, yay!
+                    uri = new URI("jar:" + uri);
+                    try {
+                        fs = FileSystems.newFileSystem(uri, Map.of(), null);
+                    } catch (FileSystemAlreadyExistsException e) {
+                        fs = FileSystems.getFileSystem(uri);
+                    }
+                } else {
+                	// JarInJar is fucking stupid and breaks horribly if it knows about files directly.
+                	// So because I don't want to go into the rabbit hole that is digging into that
+                	// Any non-standard file system will be wrapped in a Union File System
+                	// This still gets the performance benefit of having 90% of everything bypass the UFS
+                	// TODO: [SM] Remove JarInJar file system in favor of a simpler dependency management system.
+                    fs = UFSP.newFileSystem(paths[0], Map.of("filter", (BiPredicate<String, String>)(a, b) -> true));
                 }
             } else {
                 var map = new HashMap<String, Object>();

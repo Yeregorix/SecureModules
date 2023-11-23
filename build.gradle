@@ -6,7 +6,7 @@ plugins {
     id 'eclipse'
     id 'org.cadixdev.licenser' version '0.6.1'
     id 'org.gradlex.extra-java-module-info' version '1.4.2'
-    id 'net.minecraftforge.gradleutils' version '2.+'
+    id 'net.minecraftforge.gradleutils' version '[2.3.0,2.4)'
 }
 
 group = 'net.minecraftforge'
@@ -34,7 +34,7 @@ extraJavaModuleInfo {
 }
 
 changelog {
-    fromTag '0.9'
+    from '0.9'
 }
 
 tasks.named('jar', Jar).configure {

@@ -124,9 +124,22 @@ public class UnionFileSystemProvider extends FileSystemProvider {
     }
 
     private synchronized String makeKey(Path path) {
-        var key= (path instanceof UnionPath p) ? p.getFileSystem().getKey() :
-                        path.toAbsolutePath().normalize().toUri().getPath();
-        return key.replace('!', '_') + "#" + index++;
+        String key;
+        if (path instanceof UnionPath p)
+        	key = p.getFileSystem().getKey();
+        else {
+        	var uri = path.toAbsolutePath().normalize().toUri();
+        	key = uri.getPath();
+        	if (key == null) // Fuck it this doesn't actually mean anything is just nice for debugging
+        		key = uri.toString();
+        }
+
+        key = key.replace('!', '_') + "#" + index++;
+
+        if (key.charAt(0) != '/')
+        	key = '/' + key; // URI's require anything that uses schemas to use absolute paths. So make sure our key is absolute.
+
+        return key;
     }
 
     @Override
