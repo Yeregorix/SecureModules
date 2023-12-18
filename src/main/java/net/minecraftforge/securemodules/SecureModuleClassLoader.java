@@ -190,7 +190,7 @@ public class SecureModuleClassLoader extends SecureClassLoader {
             if (module != null) {
                 var ref = module.reference();
                 try (var reader = ref.open()) {
-                    return this.getClassBytes(reader, ref, name);
+                    bytes = this.getClassBytes(reader, ref, name);
                 }
             } else {
                 var parent = this.packageToParentLoader.get(pkg);
