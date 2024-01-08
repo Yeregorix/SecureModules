@@ -197,11 +197,11 @@ public class Jar implements SecureJar {
                         fs = FileSystems.getFileSystem(uri);
                     }
                 } else {
-                	// JarInJar is fucking stupid and breaks horribly if it knows about files directly.
-                	// So because I don't want to go into the rabbit hole that is digging into that
-                	// Any non-standard file system will be wrapped in a Union File System
-                	// This still gets the performance benefit of having 90% of everything bypass the UFS
-                	// TODO: [SM] Remove JarInJar file system in favor of a simpler dependency management system.
+                    // JarInJar is fucking stupid and breaks horribly if it knows about files directly.
+                    // So because I don't want to go into the rabbit hole that is digging into that
+                    // Any non-standard file system will be wrapped in a Union File System
+                    // This still gets the performance benefit of having 90% of everything bypass the UFS
+                    // TODO: [SM] Remove JarInJar file system in favor of a simpler dependency management system.
                     fs = UFSP.newFileSystem(paths[0], Map.of("filter", (BiPredicate<String, String>)(a, b) -> true));
                 }
             } else {
@@ -412,8 +412,20 @@ public class Jar implements SecureJar {
         }
 
         @Override
-        public Optional<InputStream> open(final String name) {
-            return jar.findFile(name).map(Paths::get).map(LambdaExceptionUtils.rethrowFunction(Files::newInputStream));
+        public Optional<InputStream> open(String name) {
+            // Path.toURI() can sometimes return URIs that are invalid syntax/can't be passed to Paths.get
+            // Specifically ZipPath and jars with []'s. https://github.com/MinecraftForge/MinecraftForge/issues/9842
+            // So bypass all of that and get the InputStream from the path itself.
+            name = jar.nameOverrides.getOrDefault(name, name);
+            var resolved = jar.filesystemRoot.resolve(name);
+            if (Files.exists(resolved)) {
+                try {
+                    return Optional.of(Files.newInputStream(resolved));
+                } catch (IOException e) {
+                    return sneak(e);
+                }
+            }
+            return Optional.empty();
         }
 
         @Override
