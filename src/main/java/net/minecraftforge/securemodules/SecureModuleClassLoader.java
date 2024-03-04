@@ -102,14 +102,18 @@ public class SecureModuleClassLoader extends SecureClassLoader {
         super(name, getSingleParent(parent, parentLoaders));
         this.DEBUG = shouldDebug(name);
 
-        if (parent == null && parentLoaders.size() == 1)
-            this.parent = parentLoaders.iterator().next();
-        else
-            this.parent = parent;
         this.configuration = config;
         this.useCachedSignersForUnsignedCode = useCachedSignersForUnsignedCode;
         this.parents = findAllParentLayers(parentLayers);
-        this.allParentLoaders = !parentLoaders.isEmpty() ? parentLoaders : findAllParentLoaders(this.parents);
+
+        // If we only have one parent, then use it as the main parent so we don't duplicate resources
+        if (parent == null && parentLoaders.size() == 1) {
+            this.parent = parentLoaders.iterator().next();
+            this.allParentLoaders = Collections.emptyList();
+        } else {
+            this.parent = parent;
+            this.allParentLoaders = !parentLoaders.isEmpty() ? parentLoaders : findAllParentLoaders(this.parents);
+        }
 
         // Find all modules for this config, if the reference is our special Secure reference, we can define packages with security info.
         for (var module : config.modules()) {
