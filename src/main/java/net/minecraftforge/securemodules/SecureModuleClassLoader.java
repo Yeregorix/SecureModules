@@ -311,7 +311,7 @@ public class SecureModuleClassLoader extends SecureClassLoader {
         // TODO: [SM] If our parent is null we should look a the bootstrap classloader, but that requires calling super, which will duplicate resources
 
         return new Enumeration<>() {
-            private Enumeration<Enumeration<URL>> itr = Collections.enumeration(results);
+            private final Enumeration<Enumeration<URL>> itr = Collections.enumeration(results);
             private Enumeration<URL> current = findNext();
 
             private Enumeration<URL> findNext() {
@@ -598,7 +598,7 @@ public class SecureModuleClassLoader extends SecureClassLoader {
         });
     }
 
-    private static ModuleReader NOOP_READER = new ModuleReader() {
+    private static final ModuleReader NOOP_READER = new ModuleReader() {
         @Override
         public Optional<URI> find(String name) throws IOException {
             return Optional.empty();
