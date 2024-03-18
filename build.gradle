@@ -4,9 +4,9 @@ plugins {
     id 'java-library'
     id 'maven-publish'
     id 'eclipse'
-    id 'org.cadixdev.licenser' version '0.6.1'
     id 'org.gradlex.extra-java-module-info' version '1.4.2'
     id 'net.minecraftforge.gradleutils' version '[2.3.0,2.4)'
+    id 'net.minecraftforge.licenser' version '1.0.1'
 }
 
 group = 'net.minecraftforge'
@@ -27,6 +27,13 @@ repositories {
 dependencies {
     api(libs.bundles.asm)
     implementation(libs.unsafe)
+}
+
+configurations.all {
+    outgoing {
+        capability("net.minecraftforge:securemodules:$version")
+        capability("cpw.mods:securejarhandler:$version")
+    }
 }
 
 extraJavaModuleInfo {
@@ -58,7 +65,7 @@ tasks.register('writeManifest') {
 
 eclipse {
     synchronizationTasks writeManifest
-    autoBuildTasks writeManifest 
+    autoBuildTasks writeManifest
 }
 
 license {
@@ -67,6 +74,9 @@ license {
 
 publishing {
     publications.register('mavenJava', MavenPublication) {
+        configurations.all {
+            suppressPomMetadataWarningsFor(it.name)
+        }
         from components.java
         artifactId = 'securemodules'
         pom {
