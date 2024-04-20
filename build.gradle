@@ -31,6 +31,7 @@ dependencies {
 
 configurations.all {
     outgoing {
+        capability("net.minecraftforge:$project.name:$version") // For sub modules, they require the exact casing of the name
         capability("net.minecraftforge:securemodules:$version")
         capability("cpw.mods:securejarhandler:$version")
     }

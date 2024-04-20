@@ -292,11 +292,23 @@ public class Jar implements SecureJar {
     public static Provider getProvider(Path path, BiPredicate<String, String> filter) {
         var sname = path.getFileName().toString();
         try {
-            var entries = Files.readAllLines(path).stream()
-                .map(String::trim)
-                .filter(l -> l.length() > 0 && !l.startsWith("#"))
-                .filter(p -> filter == null || filter.test(p.replace('.', '/'), ""))
-                .toList();
+            var entries = new ArrayList<String>();
+            for (var line : Files.readAllLines(path)) {
+                int idx = line.indexOf('#');
+                if (idx != -1)
+                    line = line.substring(0, idx);
+                line = line.trim();
+
+                if (line.isEmpty())
+                    continue;
+
+                if (filter != null && !filter.test(line.replace('.', '/'), ""))
+                    continue;
+
+                entries.add(line);
+
+            }
+
             return new Provider(sname, entries);
         } catch (IOException e) {
             return sneak(e);
