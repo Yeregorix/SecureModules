@@ -1,12 +1,9 @@
-import net.minecraftforge.gradleutils.PomUtils
-
 plugins {
     id 'java-library'
     id 'maven-publish'
     id 'eclipse'
-    id 'org.gradlex.extra-java-module-info' version '1.4.2'
-    id 'net.minecraftforge.gradleutils' version '[2.3.0,2.4)'
-    id 'net.minecraftforge.licenser' version '1.0.1'
+    alias(libs.plugins.license)
+    alias(libs.plugins.gradleutils)
 }
 
 group = 'net.minecraftforge'
@@ -37,10 +34,6 @@ configurations.all {
     }
 }
 
-extraJavaModuleInfo {
-    failOnMissingModuleInfo = false
-}
-
 changelog {
     from '0.9'
 }
@@ -50,9 +43,9 @@ tasks.named('jar', Jar).configure {
         attributes([
             'Specification-Title':    'SecureModules',
             'Specification-Vendor':   'Forge Development LLC',
-            'Specification-Version':  gradleutils.gitInfo.tag,
+            'Specification-Version':   gradleutils.gitInfo.tag,
             'Implementation-Title':   'SecureModules',
-            'Implementation-Version': project.version,
+            'Implementation-Version':  project.version,
             'Implementation-Vendor':  'Forge Development LLC'
         ] as LinkedHashMap)
     }
@@ -79,14 +72,14 @@ publishing {
             suppressPomMetadataWarningsFor(it.name)
         }
         from components.java
-        artifactId = 'securemodules'
+        //artifactId = 'securemodules'
         pom {
             name = 'Secure Modular handler'
             description = 'Making the Java modular system provide security information'
-            license PomUtils.Licenses.LGPLv2_1
+            license gradleutils.pom.Licenses.LGPLv2_1
             developers {
-                developer PomUtils.Developers.cpw
-                developer PomUtils.Developers.LexManos
+                developer gradleutils.pom.Developers.cpw
+                developer gradleutils.pom.Developers.LexManos
             }
         }
     }

@@ -1,0 +1,38 @@
+plugins {
+    id 'eclipse'
+    id 'java-library'
+    alias(libs.plugins.license)
+    alias(libs.plugins.gradleutils)
+}
+
+repositories {
+    mavenCentral()
+    maven gradleutils.forgeMaven
+    mavenLocal()
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(9)
+}
+
+license {
+    header = rootProject.file("LICENSE-header.txt")
+}
+
+configurations {
+    java9 {
+        canBeConsumed = true
+        canBeResolved = false
+        extendsFrom implementation
+    }
+}
+
+artifacts {
+    java9(jar) {
+        builtBy(jar)
+    }
+}
+
+dependencies {
+    implementation project(':sm-test-data')
+}

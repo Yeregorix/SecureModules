@@ -12,6 +12,12 @@ plugins {
 dependencyResolutionManagement {
     versionCatalogs {
         libs {
+            plugin('extra-module', 'org.gradlex.extra-java-module-info').version('1.4.2')
+            plugin('license',      'net.minecraftforge.licenser'       ).version('1.0.1')
+            plugin('gradleutils',  'net.minecraftforge.gradleutils'    ).version('[2.3.0,2.4)')
+            plugin('eclipse-apt',  'com.diffplug.eclipse.apt'          ).version('3.43.0')
+            plugin('signer',       'net.minecraftforge.gradlejarsigner').version('1.0.5')
+
             version('asm', '9.7')
             library('asm',         'org.ow2.asm', 'asm'        ).versionRef('asm')
             library('asm-tree',    'org.ow2.asm', 'asm-tree'   ).versionRef('asm')
@@ -19,12 +25,20 @@ dependencyResolutionManagement {
             bundle('asm', ['asm', 'asm-tree', 'asm-commons'])
 
             version('junit', '5.10.0')
-            library('junit-api', 'org.junit.jupiter', 'junit-jupiter-api').versionRef('junit')
-            library('junit-engine', 'org.junit.jupiter', 'junit-jupiter-engine').versionRef('junit')
-            library('junit-platform-launcher', 'org.junit.platform:junit-platform-launcher:1.10.0')
-            bundle('junit-runtime', ['junit-engine', 'junit-platform-launcher'])
+            library('junit-api',      'org.junit.jupiter',  'junit-jupiter-api'      ).versionRef('junit')
+            library('junit-engine',   'org.junit.jupiter',  'junit-jupiter-engine'   ).versionRef('junit')
+            library('junit-platform', 'org.junit.platform', 'junit-platform-launcher').version('1.10.0')
+            bundle('junit-runtime', ['junit-engine', 'junit-platform'])
 
             library('unsafe', 'net.minecraftforge:unsafe:0.9.2')
+
+            version('jmh', '1.35')
+            library('jmh-core', 'org.openjdk.jmh', 'jmh-core'                ).versionRef('jmh')
+            library('jmh-ap',   'org.openjdk.jmh', 'jmh-generator-annprocess').versionRef('jmh')
+
+            // groovy and ivy should match the version gradle ships, but it gets weird
+            library('ivy',    'org.apache.ivy:ivy:2.4.0')
+            library('groovy', 'org.codehaus.groovy:groovy-all:3.0.19')
         }
     }
 }
@@ -32,3 +46,5 @@ dependencyResolutionManagement {
 rootProject.name = 'SecureModules'
 include 'sm-jmh'
 include 'sm-test'
+include 'sm-test-data'
+include 'sm-test-data-java9'

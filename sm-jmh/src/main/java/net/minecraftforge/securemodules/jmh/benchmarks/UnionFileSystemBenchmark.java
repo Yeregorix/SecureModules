@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) Forge Development LLC
+ * SPDX-License-Identifier: LGPL-2.1-only
+ */
+
 package net.minecraftforge.securemodules.jmh.benchmarks;
 
 import cpw.mods.niofs.union.UnionFileSystem;

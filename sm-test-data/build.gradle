@@ -1,0 +1,132 @@
+plugins {
+    id 'eclipse'
+    id 'java-library'
+    alias(libs.plugins.signer)
+    alias(libs.plugins.license)
+    alias(libs.plugins.gradleutils)
+}
+
+evaluationDependsOn(':sm-test-data-java9')
+
+repositories {
+    mavenCentral()
+    maven gradleutils.forgeMaven
+    mavenLocal()
+
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(8)
+}
+
+license {
+    header = rootProject.file("LICENSE-header.txt")
+}
+
+jarSigner {
+    alias = 'test'
+    storePass = 'password'
+    keyPass = 'password'
+    keyStoreFile = file('keystore.jks')
+}
+
+configurations {
+    java9 {
+        canBeConsumed = false
+        transitive = false
+    }
+}
+
+dependencies {
+    java9(project(path: ':sm-test-data-java9', configuration: 'java9'))
+}
+
+tasks.named('jar').configure {
+    archiveClassifier = 'unsigned'
+    manifest {
+        attributes([
+            'Specification-Title':    'SecureModules-Test-Data',
+            'Specification-Vendor':   'Forge Development LLC',
+            'Specification-Version':  '1.0',
+            'Implementation-Title':   'SecureModules-Test-Data',
+            'Implementation-Version': '1.0.0',
+            'Implementation-Vendor':  'Forge Development LLC',
+            'Automatic-Module-Name':  'test'
+        ])
+    }
+}
+
+tasks.register('emptyJar', Jar).configure {
+    archiveClassifier = 'empty'
+}
+
+tasks.register('signedJar', Jar).configure {
+    dependsOn(jar)
+    archiveClassifier = 'signed'
+    manifest.from(jar.manifest)
+    from (zipTree(jar.archiveFile)) {
+        include 'test/Signed.class'
+    }
+    jarSigner.sign(it)
+}
+
+tasks.register('partialJar', Zip).configure {
+    dependsOn(signedJar)
+    archiveClassifier = 'partial'
+    from (zipTree(signedJar.archiveFile))
+    from(sourceSets.main.output) {
+        include 'test/UnSigned.class'
+    }
+}
+
+tasks.register('invalidJar', Zip).configure {
+    dependsOn(signedJar, configurations.java9)
+    archiveClassifier = 'invalid'
+    
+    // Include everything from the signed jar task which includes signature data, except the modified class must be first as manifests must be first entries in the jar
+    from (zipTree(signedJar.archiveFile)) {
+        exclude 'test/Signed.class'
+    }
+    
+    from(configurations.java9.collect { it.isDirectory() ? it : zipTree(it) }) {
+        include 'test/Signed.class'
+    }
+}
+
+tasks.register('multiReleaseJar', Jar).configure {
+    dependsOn(signedJar, configurations.java9)
+    archiveClassifier  = 'multirelease'
+    manifest.from(jar.manifest)
+    manifest {
+        attributes.put('Multi-Release', 'true')
+    }
+
+    from (zipTree(signedJar.archiveFile))
+
+    from(configurations.java9.collect { it.isDirectory() ? it : zipTree(it) }) {
+        into 'META-INF/versions/9'
+        exclude 'module-info.class'
+        exclude 'META-INF/*'
+    }
+
+    from(configurations.java9.collect { it.isDirectory() ? it : zipTree(it) }) {
+        include 'module-info.class'
+    }
+    jarSigner.sign(it)
+}
+
+artifacts {
+    archives jar // Standard jar, No signatures
+    archives emptyJar // Empty jar except for an empty manifest
+    archives signedJar // Standard jar, contains spec info and complete valid signatures
+    archives partialJar // Standard jar, has signatures, but is missing signature for some entries
+    archives invalidJar // Standard jar, has signatures, but one of the entries is invalid
+    archives multiReleaseJar // Multi Release Jar overrides a signed class with a valid signature
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+    destinationDirectory = project(':sm-test').file('src/test/resources')
+    archiveFileName = archiveClassifier.get() + '.jar'
+}

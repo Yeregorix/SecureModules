@@ -1,9 +1,8 @@
 plugins {
-    id 'org.cadixdev.licenser' version '0.6.1'
     id 'eclipse'
     id 'java-library'
-    id 'org.gradlex.extra-java-module-info' version '1.4.2'
-    id 'net.minecraftforge.gradleutils' version '[2.3.0,2.4)'
+    alias(libs.plugins.license)
+    alias(libs.plugins.gradleutils)
 }
 
 repositories {
@@ -22,8 +21,8 @@ license {
 
 test {
     useJUnitPlatform()
-    reports.html.destination = rootProject.file("build/reports/")
-    reports.junitXml.destination = rootProject.file("build/test-results/")
+    reports.html.outputLocation = rootProject.file("build/reports/")
+    reports.junitXml.outputLocation = rootProject.file("build/test-results/")
 }
 
 dependencies {
@@ -31,10 +30,6 @@ dependencies {
     testImplementation(libs.unsafe)
     testImplementation(libs.junit.api)
     testRuntimeOnly(libs.bundles.junit.runtime)
-}
-
-extraJavaModuleInfo {
-    failOnMissingModuleInfo = false
 }
 
 // If we are being told a specific vendor then we are probably being run in parallel
@@ -50,13 +45,13 @@ if (project.hasProperty('javaVendor') && project.hasProperty('javaVersion')) {
     }
 
     dependencies {
-        groovyScript 'org.apache.ivy:ivy:2.4.0'
-        groovyScript 'org.codehaus.groovy:groovy-all:3.0.19'
+        groovyScript(libs.ivy)
+        groovyScript(libs.groovy)
     }
 
     tasks.register('collectTests', JavaExec) {
         classpath = configurations.groovyScript
-        main = 'groovy.ui.GroovyMain'
+        mainClass = 'groovy.ui.GroovyMain'
         args '.github/workflows/aggregate-junit-tests.groovy'
         workingDir rootProject.projectDir
     }
@@ -70,8 +65,8 @@ if (project.hasProperty('javaVendor') && project.hasProperty('javaVersion')) {
                     it.languageVersion.set(JavaLanguageVersion.of(javaVersion))
                     it.implementation.set(JvmImplementation.VENDOR_SPECIFIC)
                 })
-                reports.html.destination = rootProject.file("build/test_artifacts/test-reports-${javaVendor}-${javaVersion}/")
-                reports.junitXml.destination = rootProject.file("build/test_artifacts/test-results-${javaVendor}-${javaVersion}/")
+                reports.html.outputLocation = rootProject.file("build/test_artifacts/test-reports-${javaVendor}-${javaVersion}/")
+                reports.junitXml.outputLocation = rootProject.file("build/test_artifacts/test-results-${javaVendor}-${javaVersion}/")
             }
             test.dependsOn(task)
             collectTests.mustRunAfter(task)

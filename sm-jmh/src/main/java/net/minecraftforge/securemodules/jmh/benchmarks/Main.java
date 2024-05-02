@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) Forge Development LLC
+ * SPDX-License-Identifier: LGPL-2.1-only
+ */
+
 package net.minecraftforge.securemodules.jmh.benchmarks;
 
 // This is needed because eclipse doesn't allow for the main to be outside the module in module builds 0.o?

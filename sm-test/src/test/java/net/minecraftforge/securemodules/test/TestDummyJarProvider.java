@@ -31,6 +31,10 @@ import java.util.jar.Manifest;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class TestDummyJarProvider {
+    /**
+     * Test creating a jar completely in memory. This could be useful for libraries that create code at runtime.
+     * But honestly its just a mock up that should probably be deleted, Or have the Dummy system exposed as a proper API
+     */
     @Test
     public void testDummySecureJar() {
         final var jmf = SecureModuleFinder.of(new DummyJar());
@@ -52,6 +56,7 @@ public class TestDummyJarProvider {
         cn.accept(cw);
         return cw.toByteArray();
     }
+
     record TestModuleProvider() implements SecureJar.ModuleDataProvider {
         @Override
         public String name() {
@@ -88,6 +93,7 @@ public class TestDummyJarProvider {
             return new CodeSigner[0];
         }
     }
+
     record DummyJar() implements SecureJar {
         @Override
         public ModuleDataProvider moduleDataProvider() {
