@@ -227,6 +227,9 @@ public class Jar implements SecureJar {
         if (!hasSecurityData())
             return null;
 
+        // If we're a multi-release jar we need to be sure to check the correct entry.
+        name = this.nameOverrides.getOrDefault(name, name);
+
         var data = statusData.get(name);
         if (data != null)
             return data.signers();

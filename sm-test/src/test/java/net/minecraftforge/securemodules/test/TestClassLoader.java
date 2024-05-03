@@ -175,7 +175,6 @@ public class TestClassLoader {
      * Make sure that we can validate the Multi-Release jar's contents
      */
     @Test // Multi-Release jar is signed
-    @Disabled
     void testMultiRelease() throws Exception {
         boot("testMultiReleaseBoot");
     }
