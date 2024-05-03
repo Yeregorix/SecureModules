@@ -37,6 +37,10 @@ configurations {
     }
 }
 
+sourceSets {
+    packageInfo
+}
+
 dependencies {
     java9(project(path: ':sm-test-data-java9', configuration: 'java9'))
 }
@@ -115,6 +119,13 @@ tasks.register('multiReleaseJar', Jar).configure {
     jarSigner.sign(it)
 }
 
+tasks.register('packageInfoJar', Zip).configure {
+    dependsOn(jar, sourceSets.packageInfo.getCompileTaskName('java'))
+    archiveClassifier = 'package-info'
+    from(zipTree(jar.archiveFile))
+    from(sourceSets.packageInfo.output)
+}
+
 artifacts {
     archives jar // Standard jar, No signatures
     archives emptyJar // Empty jar except for an empty manifest
@@ -122,6 +133,7 @@ artifacts {
     archives partialJar // Standard jar, has signatures, but is missing signature for some entries
     archives invalidJar // Standard jar, has signatures, but one of the entries is invalid
     archives multiReleaseJar // Multi Release Jar overrides a signed class with a valid signature
+    archives packageInfoJar // A jar with package level annotations, triggers a bug in SMCL that makes them not load
 }
 
 tasks.withType(AbstractArchiveTask).configureEach {

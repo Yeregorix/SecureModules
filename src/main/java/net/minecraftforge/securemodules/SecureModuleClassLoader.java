@@ -38,6 +38,9 @@ import java.util.jar.Attributes;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import net.minecraftforge.unsafe.UnsafeHacks;
+import net.minecraftforge.unsafe.UnsafeFieldAccess;
+
 public class SecureModuleClassLoader extends SecureClassLoader {
     // TODO: [SM] Introduce proper logging framework
     private final boolean DEBUG;
@@ -480,11 +483,21 @@ public class SecureModuleClassLoader extends SecureClassLoader {
 
         var data = this.ourModulesSecure.get(ref.descriptor().name());
         var url = ref.location().map(SecureModuleClassLoader::toURL).orElse(null);
-        tryDefinePackage(name, data, url);
+        // Try defining the package before the class, if we need to add version information
+        // because modules and version information are mutually exclusive.. for some reason.
+        var pkg = tryDefinePackage(name, data, url);
 
         var signers = data == null ? null : data.getCodeSigners(classToResource(name), bytes);
-        return defineClass(name, bytes, 0, bytes.length, getCodeSource(name, url, signers));
+        var cls = defineClass(name, bytes, 0, bytes.length, getCodeSource(name, url, signers));
+
+        // If the package was added with version information, it'll be in the unnamed module
+        // Set the correct module
+        if (pkg != null && cls.getModule() != this.getUnnamedModule())
+            moduleAccess.set(pkg, cls.getModule());
+
+        return cls;
     }
+    private static final UnsafeFieldAccess<? super Package, Module> moduleAccess = UnsafeHacks.findField(Package.class.getSuperclass(), "module");
 
     @Override
     protected PermissionCollection getPermissions(CodeSource codesource) {
@@ -501,34 +514,43 @@ public class SecureModuleClassLoader extends SecureClassLoader {
 
     private Package tryDefinePackage(String name, SecureModuleReference secure, URL base) throws IllegalArgumentException {
         var pkg = classToPackage(name);
-        var ret = getDefinedPackage(pkg);
-        if (ret == null) {
-            synchronized (this) {
-                ret = getDefinedPackage(pkg);
-                if (ret == null) {
-                    String path = pkg.replace('.', '/').concat("/");
-                    String specTitle = null, specVersion = null, specVendor = null;
-                    String implTitle = null, implVersion = null, implVendor = null;
-                    URL sealBase = null;
 
-                    if (secure != null) {
-                        var main = secure.getMainAttributes();
-                        var trusted = secure.getTrustedAttributes(path);
-                        specTitle   = read(main, trusted, Attributes.Name.SPECIFICATION_TITLE);
-                        specVersion = read(main, trusted, Attributes.Name.SPECIFICATION_VERSION);
-                        specVendor  = read(main, trusted, Attributes.Name.SPECIFICATION_VENDOR);
-                        implTitle   = read(main, trusted, Attributes.Name.IMPLEMENTATION_TITLE);
-                        implVersion = read(main, trusted, Attributes.Name.IMPLEMENTATION_VERSION);
-                        implVendor  = read(main, trusted, Attributes.Name.IMPLEMENTATION_VENDOR);
-                        if ("true".equals(read(main, trusted, Attributes.Name.SEALED)))
-                            sealBase = null; //TODO: [SM] Implement and test package sealing
-                    }
-
-                    ret = definePackage(pkg, specTitle, specVersion, specVendor, implTitle, implVersion, implVendor, sealBase);
-                }
-            }
+        if (secure == null || getDefinedPackage(pkg) != null) {
+            return null;
         }
-        return ret;
+
+        synchronized (this) {
+            if (getDefinedPackage(pkg) != null) {
+                return null;
+            }
+
+            String path = pkg.replace('.', '/').concat("/");
+            String specTitle = null, specVersion = null, specVendor = null;
+            String implTitle = null, implVersion = null, implVendor = null;
+            URL sealBase = null;
+
+            var main = secure.getMainAttributes();
+            var trusted = secure.getTrustedAttributes(path);
+            specTitle   = read(main, trusted, Attributes.Name.SPECIFICATION_TITLE);
+            specVersion = read(main, trusted, Attributes.Name.SPECIFICATION_VERSION);
+            specVendor  = read(main, trusted, Attributes.Name.SPECIFICATION_VENDOR);
+            implTitle   = read(main, trusted, Attributes.Name.IMPLEMENTATION_TITLE);
+            implVersion = read(main, trusted, Attributes.Name.IMPLEMENTATION_VERSION);
+            implVendor  = read(main, trusted, Attributes.Name.IMPLEMENTATION_VENDOR);
+            if ("true".equals(read(main, trusted, Attributes.Name.SEALED)))
+                sealBase = null; //TODO: [SM] Implement and test package sealing
+
+            if (specTitle == null && specVersion == null && specVendor == null &&
+                implTitle == null && implVersion == null && implVendor == null &&
+                sealBase == null) {
+                return null;
+            }
+
+            return definePackage(pkg,
+                specTitle, specVersion, specVendor,
+                implTitle, implVersion, implVendor, sealBase
+            );
+        }
     }
 
     private static URL toURL(URI uri) {

@@ -197,7 +197,6 @@ public class TestClassLoader {
      * Causing package info classes to not load, so make sure we properly load them.
      */
     @Test
-    @Disabled
     void testPackageInfo() throws Exception {
         boot("testPackageInfoBoot");
     }
