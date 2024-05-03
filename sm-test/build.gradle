@@ -29,6 +29,7 @@ dependencies {
     testImplementation(rootProject)
     testImplementation(libs.unsafe)
     testImplementation(libs.junit.api)
+    testImplementation(libs.bundles.bootstrap) { transitive false }
     testRuntimeOnly(libs.bundles.junit.runtime)
 }
 

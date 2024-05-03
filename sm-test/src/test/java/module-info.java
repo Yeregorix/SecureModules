@@ -12,6 +12,15 @@ module net.minecraftforge.securemodules.test {
     requires org.objectweb.asm;
     requires org.objectweb.asm.tree;
     requires net.minecraftforge.unsafe;
+    requires net.minecraftforge.bootstrap.api;
+    requires net.minecraftforge.bootstrap;
 
-    opens net.minecraftforge.securemodules.test to org.junit.platform.commons;
+    opens net.minecraftforge.securemodules.test to
+        org.junit.platform.commons,
+        net.minecraftforge.bootstrap;
+
+    exports net.minecraftforge.securemodules.test;
+
+    provides net.minecraftforge.bootstrap.api.BootstrapEntryPoint with
+        net.minecraftforge.securemodules.test.BootstrapEntry;
 }

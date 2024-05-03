@@ -96,15 +96,15 @@ eclipse.classpath {
 
 allprojects {
     ext.VALID_VMS = [
-        'Adoptium':  [16, 17, 18, 19, 20, 21],
-        'Amazon':    [16, 17, 18, 19, 20, 21],
-        'Azul':      (16..21),
-        'BellSoft':  (16..21),
-        'Graal_VM':  [16, 17,     19, 20, 21],
-        'IBM':       [16, 17, 18, 19, 20    ],
-        'Microsoft': [16, 17,             21],
-        'Oracle':    (16..21),
-        'SAP':       (16..20)
+        'Adoptium':  [16, 17, 18, 19, 20, 21, 22],
+        'Amazon':    [16, 17, 18, 19, 20, 21, 22],
+        'Azul':      (16..22),
+        'BellSoft':  (16..22),
+        'Graal_VM':  [16, 17,     19, 20, 21, 22],
+        'IBM':       [16, 17, 18, 19, 20, 21    ],
+        'Microsoft': [16, 17,             21    ],
+        'Oracle':    (16..22),
+        'SAP':       (16..22)
     ]
     //ext.VALID_VMS = [ 'Adoptium':  [16] ]
 }
