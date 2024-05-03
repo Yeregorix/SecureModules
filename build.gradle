@@ -72,7 +72,7 @@ publishing {
             suppressPomMetadataWarningsFor(it.name)
         }
         from components.java
-        //artifactId = 'securemodules'
+        artifactId = 'securemodules'
         pom {
             name = 'Secure Modular handler'
             description = 'Making the Java modular system provide security information'
