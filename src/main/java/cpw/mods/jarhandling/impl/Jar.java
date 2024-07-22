@@ -282,7 +282,7 @@ public class Jar implements SecureJar {
             return List.of();
 
         try {
-            return Files.walk(services)
+            return Files.list(services)
                 .filter(Files::isRegularFile)
                 .map(path -> getProvider(path, filter))
                 .toList();
