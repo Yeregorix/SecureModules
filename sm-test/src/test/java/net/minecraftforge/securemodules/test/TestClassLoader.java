@@ -9,6 +9,7 @@ import java.lang.module.ModuleFinder;
 import java.nio.file.Paths;
 import java.security.cert.Certificate;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -58,7 +59,7 @@ public class TestClassLoader {
 
     private static Class<?> getClass(String name, ClassLoader cl) throws Exception {
         var cls = Class.forName(name, false, cl);
-        assertNotNull(cls, "Failed to find test.Signed");
+        assertNotNull(cls, "Failed to find " + name);
         assertEquals("test", cls.getModule().getName(), "Invalid Module");
         return cls;
     }
@@ -212,5 +213,26 @@ public class TestClassLoader {
 
         var info = getClass("test.package-info", cl);
         assertEquals(cls.getModule(), info.getModule(), "Mismatched modules");
+    }
+
+    @Test
+    void testInterruption() throws Exception {
+        boot("testInterruptionBoot");
+    }
+    public static void testInterruptionBoot() throws Exception {
+        var cl = setup("signed");
+
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        new Thread(() -> {
+            try {
+                Thread.currentThread().interrupt();
+                getClass("test.Signed", cl);
+                future.complete(null);
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        }).start();
+
+        future.join();
     }
 }
