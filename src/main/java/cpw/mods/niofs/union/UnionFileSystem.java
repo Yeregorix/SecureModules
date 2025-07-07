@@ -9,10 +9,6 @@ import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
-import java.nio.channels.FileChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.AccessMode;
 import java.nio.file.DirectoryStream;
@@ -42,32 +38,10 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 
-import net.minecraftforge.unsafe.UnsafeHacks;
+import cpw.mods.util.ZipUtils;
 
 public class UnionFileSystem extends FileSystem {
-    private static final MethodHandle ZIPFS_EXISTS;
-    private static final MethodHandle ZIPFS_CH;
-    private static final MethodHandle FCI_UNINTERUPTIBLE;
     static final String SEP_STRING = "/";
-
-    static {
-        try {
-            var hackfield = MethodHandles.Lookup.class.getDeclaredField("IMPL_LOOKUP");
-            UnsafeHacks.setAccessible(hackfield);
-            MethodHandles.Lookup hack = (MethodHandles.Lookup) hackfield.get(null);
-
-            var clz = Class.forName("jdk.nio.zipfs.ZipPath");
-            ZIPFS_EXISTS = hack.findSpecial(clz, "exists", MethodType.methodType(boolean.class), clz);
-
-            clz = Class.forName("jdk.nio.zipfs.ZipFileSystem");
-            ZIPFS_CH = hack.findGetter(clz, "ch", SeekableByteChannel.class);
-
-            clz = Class.forName("sun.nio.ch.FileChannelImpl");
-            FCI_UNINTERUPTIBLE = hack.findSpecial(clz, "setUninterruptible", MethodType.methodType(void.class), clz);
-        } catch (NoSuchFieldException | IllegalAccessException | ClassNotFoundException | NoSuchMethodException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     public InputStream buildInputStream(final UnionPath path) {
         try {
@@ -142,11 +116,9 @@ public class UnionFileSystem extends FileSystem {
     private static Optional<EmbeddedFileSystemMetadata> openFileSystem(final Path path) {
         try {
             var zfs = FileSystems.newFileSystem(path);
-            SeekableByteChannel fci = (SeekableByteChannel) ZIPFS_CH.invoke(zfs);
-            if (fci instanceof FileChannel) { // we only make file channels uninterruptible because byte channels (JIJ) already are
-                FCI_UNINTERUPTIBLE.invoke(fci);
-            }
-            return Optional.of(new EmbeddedFileSystemMetadata(path, zfs, fci));
+            SeekableByteChannel ch = ZipUtils.getByteChannel(zfs);
+            ZipUtils.setUninterruptible(ch);
+            return Optional.of(new EmbeddedFileSystemMetadata(path, zfs, ch));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         } catch (Throwable t) {
@@ -245,7 +217,7 @@ public class UnionFileSystem extends FileSystem {
     private static boolean zipFsExists(UnionFileSystem ufs, Path path) {
         try {
             if (Optional.ofNullable(ufs.embeddedFileSystems.get(path.getFileSystem())).filter(efs->!efs.fsCh.isOpen()).isPresent()) throw new IllegalStateException("The zip file has closed!");
-            return (boolean) ZIPFS_EXISTS.invoke(path);
+            return ZipUtils.exists(path);
         } catch (Throwable t) {
             throw new IllegalStateException(t);
         }

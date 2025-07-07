@@ -8,13 +8,13 @@ package cpw.mods.jarhandling.impl;
 import cpw.mods.jarhandling.JarMetadata;
 import cpw.mods.jarhandling.SecureJar;
 import cpw.mods.util.LambdaExceptionUtils;
+import cpw.mods.util.ZipUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.lang.module.ModuleDescriptor;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystemAlreadyExistsException;
 import java.nio.file.FileSystems;
@@ -196,6 +196,7 @@ public class Jar implements SecureJar {
                     } catch (FileSystemAlreadyExistsException e) {
                         fs = FileSystems.getFileSystem(uri);
                     }
+                    ZipUtils.setUninterruptible(ZipUtils.getByteChannel(fs));
                 } else {
                     // JarInJar is fucking stupid and breaks horribly if it knows about files directly.
                     // So because I don't want to go into the rabbit hole that is digging into that
@@ -215,7 +216,7 @@ public class Jar implements SecureJar {
 
                 fs = UFSP.newFileSystem(base, map);
             }
-        } catch (IOException | URISyntaxException e) {
+        } catch (Throwable e) {
             return sneak(e);
         }
 
