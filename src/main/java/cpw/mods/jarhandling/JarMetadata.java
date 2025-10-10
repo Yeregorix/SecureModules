@@ -9,7 +9,10 @@ import cpw.mods.jarhandling.impl.ModuleJarMetadata;
 import cpw.mods.jarhandling.impl.SimpleJarMetadata;
 
 import java.lang.module.ModuleDescriptor;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -113,7 +116,28 @@ public interface JarMetadata {
         }
 
         // fallback parsing
-        var fn = path.getFileName().toString();
+        var fileName = path.getFileName();
+        if (fileName == null) {
+            // This is the root of a ZipFileSystem, lets try getting the name from the outer path
+            URI uri = path.toUri();
+            if ("jar".equals(uri.getScheme())) {
+                String spec = uri.getRawSchemeSpecificPart();
+                int sep = spec.indexOf("!/");
+                if (sep != -1)
+                    spec = spec.substring(0, sep);
+
+                try {
+                    fileName = Paths.get(new URI(spec)).getFileName();
+                } catch (URISyntaxException e) {
+                    // This will result in fileName == null and the IllegalArgument being thrown below
+                }
+            }
+        }
+
+        if (fileName == null)
+            throw new IllegalArgumentException("Can not make module name from path with null getFileName: " + path.toUri());
+
+        var fn = fileName.toString();
         var lastDot = fn.lastIndexOf('.');
         if (lastDot > 0) {
             fn = fn.substring(0, lastDot); // strip extension if possible
@@ -122,7 +146,7 @@ public interface JarMetadata {
         var mat = DASH_VERSION.matcher(fn);
         if (mat.find()) {
             var potential = fn.substring(mat.start() + 1);
-            var ver = safeParseVersion(potential, path.getFileName().toString());
+            var ver = safeParseVersion(potential, fileName.toString());
             var name = mat.replaceAll("");
             return new SimpleJarMetadata(cleanModuleName(name), ver, pkgs, providers);
         } else {

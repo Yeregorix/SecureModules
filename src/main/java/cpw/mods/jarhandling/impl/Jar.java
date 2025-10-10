@@ -7,7 +7,6 @@ package cpw.mods.jarhandling.impl;
 
 import cpw.mods.jarhandling.JarMetadata;
 import cpw.mods.jarhandling.SecureJar;
-import cpw.mods.util.LambdaExceptionUtils;
 import cpw.mods.util.ZipUtils;
 
 import java.io.IOException;
@@ -20,7 +19,6 @@ import java.nio.file.FileSystemAlreadyExistsException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.spi.FileSystemProvider;
 import java.security.CodeSigner;
 import java.util.ArrayList;
@@ -182,21 +180,27 @@ public class Jar implements SecureJar {
         FileSystem fs = null;
         try {
             if (filter == null && paths.length == 1) {
-                if (Files.isDirectory(paths[0]))
+                if (Files.isDirectory(paths[0])) {
+                    ZipUtils.setUninterruptible(paths[0].getFileSystem());
                     return paths[0];
+                }
+
                 var uri = paths[0].toUri();
-                if ("file".equals(uri.getScheme())) {
+                var scheme = uri.getScheme();
+
+                if ("file".equals(scheme) || "jar".equals(scheme) || "roimfs".equals(scheme)) {
                     // We have to manually open the jar files up via a URI instead of a Path
                     // because the ZipFileSystem implementation only caches the FileSystems
                     // when accessed that way. But we can only open it once or else it throws
                     // a FileSystemAlreadyExistsException. So, exceptions as codeflow, yay!
-                    uri = new URI("jar:" + uri);
+                    if (!"jar".equals(scheme))
+                        uri = new URI("jar:" + uri);
                     try {
                         fs = FileSystems.newFileSystem(uri, Map.of(), null);
                     } catch (FileSystemAlreadyExistsException e) {
                         fs = FileSystems.getFileSystem(uri);
                     }
-                    ZipUtils.setUninterruptible(ZipUtils.getByteChannel(fs));
+                    ZipUtils.setUninterruptible(fs);
                 } else {
                     // JarInJar is fucking stupid and breaks horribly if it knows about files directly.
                     // So because I don't want to go into the rabbit hole that is digging into that

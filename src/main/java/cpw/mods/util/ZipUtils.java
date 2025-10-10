@@ -19,7 +19,7 @@ import java.nio.file.Path;
  * Hacky utilities to access interals of ZipFileSystem to prevent thread interrrupts for breaking the entire FileSystem for everyone else.
  * This is an internal class, not exposed in module-info. If you're using this as a consumer, Don't.
  * See: https://github.com/MinecraftForge/SecureModules/pull/8
- * The ZipPath.exists invocation is for a performance optimization. 
+ * The ZipPath.exists invocation is for a performance optimization.
  */
 public class ZipUtils {
     private static final MethodHandle ZIPFS_EXISTS;
@@ -52,6 +52,15 @@ public class ZipUtils {
     public static void setUninterruptible(final SeekableByteChannel byteChannel) throws Throwable {
         if (byteChannel instanceof FileChannel) {
             FCI_UNINTERUPTIBLE.invoke(byteChannel);
+        }
+    }
+
+    public static void setUninterruptible(final FileSystem fileSystem) throws Throwable {
+        try {
+            SeekableByteChannel byteChannel = getByteChannel(fileSystem);
+            setUninterruptible(byteChannel);
+        } catch (ClassCastException e) {
+            // ZipFileSystem is private, so we can't do a normal check, so just eat the exception
         }
     }
 
